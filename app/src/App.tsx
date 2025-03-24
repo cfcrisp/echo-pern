@@ -1,8 +1,7 @@
 import './App.css';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from 'react';
 import { Link, Route, Routes } from 'react-router-dom';
 import { Home, Target, MessageSquare, List, Lightbulb, Settings, LogOut, Pencil, Trash2, Plus, ChevronRight, Users } from 'lucide-react';
@@ -57,10 +56,10 @@ function App() {
           <nav className="space-y-2">
             <NavItem icon={Home} label="Dashboard" to="/dashboard" />
             <NavItem icon={Target} label="Goals" to="/goals" />
-            <NavItem icon={MessageSquare} label="Feedback" to="/feedback" />
             <NavItem icon={List} label="Initiatives" to="/initiatives" />
-            <NavItem icon={Lightbulb} label="Ideas" to="/ideas" />
             <NavItem icon={Users} label="Customers" to="/customers" />
+            <NavItem icon={MessageSquare} label="Feedback" to="/feedback" />
+            <NavItem icon={Lightbulb} label="Ideas" to="/ideas" />
           </nav>
         </div>
 
@@ -85,11 +84,11 @@ function App() {
             </Button>
           </div>
           <Routes>
-            <Route path="/initiatives" element={<Initiatives />} />
             <Route path="/goals" element={<Goals />} />
+            <Route path="/initiatives" element={<Initiatives />} />
+            <Route path="/customers" element={<Customers />} />
             <Route path="/feedback" element={<Feedback />} />
             <Route path="/ideas" element={<Ideas />} />
-            <Route path="/customers" element={<Customers />} />
             {/* Add more routes in future iterations */}
             <Route path="*" element={<Goals />} /> {/* Default to Goals */}
           </Routes>
@@ -135,28 +134,45 @@ const Initiatives = () => {
 
     {/* Initiatives List */}
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {/* Initiative 1 */}
-      <Card className="hover:shadow-md transition-shadow duration-200 border-t-4 border-t-blue-500">
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-blue-600 text-xs font-medium">In Progress</span>
+      {/* Initiative Card Template */}
+      <Card className="group transition-all duration-200 hover:shadow-lg">
+        <CardHeader className="pb-2 border-b">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-blue-500"></div>
+              <span className="text-sm font-medium text-blue-600">In Progress</span>
+            </div>
             <span className="text-xs text-gray-500">Q2 Goal</span>
           </div>
-          <CardTitle className="text-lg font-medium">Reduce time to value (TTV) by 30% in Q2</CardTitle>
+          <CardTitle className="text-lg font-semibold leading-tight">
+            Reduce time to value (TTV) by 30% in Q2
+          </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="flex flex-col gap-2">
-            <div className="w-full bg-gray-100 rounded-full h-1.5 mt-1 mb-2">
-              <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: '40%' }}></div>
+        <CardContent className="pt-4">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>Progress</span>
+                <span>40%</span>
+              </div>
+              <div className="w-full bg-gray-100 rounded-full h-2">
+                <div 
+                  className="bg-blue-500 h-2 rounded-full transition-all" 
+                  style={{ width: '40%' }}
+                ></div>
+              </div>
             </div>
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-gray-600">3 ideas</span>
-              <div className="flex gap-1">
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                  <Pencil className="h-3.5 w-3.5" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Lightbulb className="h-4 w-4 text-gray-500" />
+                <span className="text-sm text-gray-600">3 ideas</span>
+              </div>
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                  <Pencil className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                  <Trash2 className="h-3.5 w-3.5" />
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                  <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -164,56 +180,45 @@ const Initiatives = () => {
         </CardContent>
       </Card>
 
-      {/* Initiative 2 */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Increase adoption of advanced reporting by 60%</CardTitle>
-          <p className="text-gray-500">
-            Users aren’t using advanced reporting as much as predicted. Define and resolve the reasons behind this.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <div className="flex justify-between items-center">
-            <div>
-              <a href="#" className="text-blue-500 hover:underline">
-                Become the go-to tool for remote teams
-              </a>
-              <span className="ml-2 text-gray-500">• 5 ideas</span>
+      {/* Additional cards following the same pattern */}
+      <Card className="group transition-all duration-200 hover:shadow-lg">
+        <CardHeader className="pb-2 border-b">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-purple-500"></div>
+              <span className="text-sm font-medium text-purple-600">Planning</span>
             </div>
-            <div className="flex gap-2">
-              <Button variant="ghost" size="sm">
-                <Pencil className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="sm">
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Initiative 3 */}
-      <Card className="hover:shadow-md transition-shadow duration-200 border-t-4 border-t-purple-500">
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-purple-600 text-xs font-medium">Planning</span>
             <span className="text-xs text-gray-500">Q3 Goal</span>
           </div>
-          <CardTitle className="text-lg font-medium">Achieve feature parity across web, iOS, & Android</CardTitle>
+          <CardTitle className="text-lg font-semibold leading-tight">
+            Achieve feature parity across platforms
+          </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="flex flex-col gap-2">
-            <div className="w-full bg-gray-100 rounded-full h-1.5 mt-1 mb-2">
-              <div className="bg-purple-500 h-1.5 rounded-full" style={{ width: '10%' }}></div>
+        <CardContent className="pt-4">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>Progress</span>
+                <span>10%</span>
+              </div>
+              <div className="w-full bg-gray-100 rounded-full h-2">
+                <div 
+                  className="bg-purple-500 h-2 rounded-full transition-all" 
+                  style={{ width: '10%' }}
+                ></div>
+              </div>
             </div>
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-gray-600">2 ideas</span>
-              <div className="flex gap-1">
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                  <Pencil className="h-3.5 w-3.5" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Lightbulb className="h-4 w-4 text-gray-500" />
+                <span className="text-sm text-gray-600">2 ideas</span>
+              </div>
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                  <Pencil className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                  <Trash2 className="h-3.5 w-3.5" />
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                  <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -221,34 +226,7 @@ const Initiatives = () => {
         </CardContent>
       </Card>
 
-      {/* Initiative 4 */}
-      <Card className="hover:shadow-md transition-shadow duration-200 border-t-4 border-t-amber-500">
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-amber-600 text-xs font-medium">Not Started</span>
-            <span className="text-xs text-gray-500">Q4 Goal</span>
-          </div>
-          <CardTitle className="text-lg font-medium">Improve dashboard load time by 60%</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col gap-2">
-            <div className="w-full bg-gray-100 rounded-full h-1.5 mt-1 mb-2">
-              <div className="bg-amber-500 h-1.5 rounded-full" style={{ width: '0%' }}></div>
-            </div>
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-gray-600">0 ideas</span>
-              <div className="flex gap-1">
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                  <Pencil className="h-3.5 w-3.5" />
-                </Button>
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* You can repeat this pattern for other cards */}
     </div>
     
     {/* Empty state - will be shown conditionally in a real implementation */}
@@ -272,5 +250,6 @@ const Initiatives = () => {
 
 
 export default App;
+
 
 // Note: Feedback component is imported from './pages/Feedback' at the top of the file
