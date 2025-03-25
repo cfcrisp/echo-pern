@@ -3,14 +3,126 @@ import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ChevronRight, Lightbulb, Pencil, Plus, Trash2 } from 'lucide-react';
+import { 
+  ChevronRight, Lightbulb, Pencil, Plus, Trash2, 
+  ChevronDown, MoreHorizontal, ExternalLink,
+  ArrowUpDown, ArrowUp, ArrowDown
+} from 'lucide-react';
+import { AddIdeaModal, EditIdeaModal } from "@/components/shared";
+import React from 'react';
+
+// Define types for better type safety
+type IdeaStatus = 'new' | 'planned' | 'completed' | 'rejected';
+type IdeaPriority = 'urgent' | 'high' | 'medium' | 'low';
+type IdeaEffort = 'xs' | 's' | 'm' | 'l' | 'xl';
+
+type Idea = {
+  id: string;
+  title: string;
+  description: string;
+  priority: IdeaPriority;
+  effort: IdeaEffort;
+  status: IdeaStatus;
+  initiative: string;
+  customer: string;
+  createdAt: string;
+};
+
+// Define sort types
+type SortColumn = keyof Idea | null;
+type SortDirection = 'asc' | 'desc';
 
 // Ideas Component
 const Ideas = () => {
   const [activeTab, setActiveTab] = useState("all");
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+  const [showMenu, setShowMenu] = useState<Record<string, boolean>>({});
+  const [sortColumn, setSortColumn] = useState<SortColumn>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  
+  // Toggle expanded state for a row
+  const toggleRowExpanded = (id: string) => {
+    setExpandedRows(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
+  
+  // Toggle menu visibility
+  const toggleMenu = (id: string) => {
+    setShowMenu(prev => {
+      // Close all other menus
+      const newState: Record<string, boolean> = {};
+      Object.keys(prev).forEach(key => {
+        newState[key] = key === id ? !prev[key] : false;
+      });
+      return newState;
+    });
+  };
+  
+  // Handle column sort
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      // If already sorting by this column, toggle direction
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // If sorting by a new column, set it and default to ascending
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
+  // Handler for saving new ideas
+  const handleSaveIdea = (idea: {
+    title: string;
+    description: string;
+    priority: IdeaPriority;
+    effort: IdeaEffort;
+    status: IdeaStatus;
+    initiativeId?: string;
+    customerId?: string;
+  }) => {
+    console.log('New idea:', idea);
+    // In a real app, this would make an API call to save the idea
+  };
+
+  // Handler for updating existing ideas
+  const handleUpdateIdea = (id: string, updatedIdea: {
+    title: string;
+    description: string;
+    priority: IdeaPriority;
+    effort: IdeaEffort;
+    status: IdeaStatus;
+    initiativeId?: string;
+    customerId?: string;
+  }) => {
+    console.log('Updating idea:', id, updatedIdea);
+    // In a real app, this would make an API call to update the idea
+  };
+
+  // Mock initiatives data for dropdown
+  const mockInitiatives = [
+    { id: '1', title: 'Redesign User Interface' },
+    { id: '2', title: 'Implement New Authentication System' },
+    { id: '3', title: 'Optimize Database Queries' },
+    { id: '4', title: 'Develop API Documentation' },
+    { id: '5', title: 'Implement Analytics Dashboard' },
+  ];
+
+  // Mock customers data for dropdown
+  const mockCustomers = [
+    { id: '1', name: 'Acme Corp' },
+    { id: '2', name: 'TechStart Ltd' },
+    { id: '3', name: 'Enterprise Solutions Inc' },
+    { id: '4', name: 'Startup Ventures' },
+    { id: '5', name: 'Global Industries' },
+    { id: '6', name: 'Local Business LLC' },
+    { id: '7', name: 'Innovative Tech' },
+    { id: '8', name: 'Strategic Partners Co' },
+  ];
   
   // Sample ideas data - in a real app, this would come from an API
-  const ideasData = [
+  const ideasData: Idea[] = [
     {
       id: "1",
       title: "Add export to PDF feature",
@@ -102,12 +214,38 @@ const Ideas = () => {
   ];
 
   // Filter ideas based on active tab
-  const filteredIdeas = activeTab === "all" 
+  let filteredIdeas = activeTab === "all" 
     ? ideasData 
     : ideasData.filter(item => item.status === activeTab);
+    
+  // Sort ideas based on current sort state
+  if (sortColumn) {
+    filteredIdeas = [...filteredIdeas].sort((a, b) => {
+      const aValue = a[sortColumn];
+      const bValue = b[sortColumn];
+      
+      if (aValue < bValue) {
+        return sortDirection === 'asc' ? -1 : 1;
+      }
+      if (aValue > bValue) {
+        return sortDirection === 'asc' ? 1 : -1;
+      }
+      return 0;
+    });
+  }
+  
+  // Helper function to display sort indicator
+  const getSortIcon = (column: SortColumn) => {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="ml-1 h-3 w-3" />;
+    }
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="ml-1 h-3 w-3" />
+      : <ArrowDown className="ml-1 h-3 w-3" />;
+  };
   
   // Helper function to get priority badge styling
-  const getPriorityBadgeStyle = (priority: 'urgent' | 'high' | 'medium' | 'low'): string => {
+  const getPriorityBadgeStyle = (priority: IdeaPriority): string => {
     switch(priority) {
       case 'urgent':
         return 'bg-red-100 text-red-800';
@@ -123,7 +261,7 @@ const Ideas = () => {
   };
 
   // Helper function to get effort badge styling
-  const getEffortBadgeStyle = (effort: 'xs' | 's' | 'm' | 'l' | 'xl'): string => {
+  const getEffortBadgeStyle = (effort: IdeaEffort): string => {
     switch(effort) {
       case 'xs':
         return 'bg-green-100 text-green-800';
@@ -135,6 +273,22 @@ const Ideas = () => {
         return 'bg-orange-100 text-orange-800';
       case 'xl':
         return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+  
+  // Helper function to get status badge styling
+  const getStatusBadgeStyle = (status: IdeaStatus): string => {
+    switch(status) {
+      case 'new':
+        return 'bg-purple-100 text-purple-800';
+      case 'planned':
+        return 'bg-blue-100 text-blue-800';
+      case 'completed':
+        return 'bg-green-100 text-green-800';
+      case 'rejected':
+        return 'bg-gray-100 text-gray-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -154,10 +308,11 @@ const Ideas = () => {
         <p className="text-gray-500 mt-1">Collect and manage product ideas from customers and team members.</p>
       </div>
       <div>
-        <Button className="gap-2">
-          <Plus className="h-4 w-4" />
-          Add Idea
-        </Button>
+        <AddIdeaModal 
+          onSave={handleSaveIdea} 
+          initiatives={mockInitiatives} 
+          customers={mockCustomers} 
+        />
       </div>
     </div>
     
@@ -177,13 +332,61 @@ const Ideas = () => {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[250px]">Title</TableHead>
-            <TableHead className="hidden md:table-cell">Description</TableHead>
-            <TableHead className="w-[100px]">Priority</TableHead>
-            <TableHead className="w-[80px]">Effort</TableHead>
-            <TableHead className="w-[100px]">Status</TableHead>
-            <TableHead className="hidden sm:table-cell w-[120px]">Customer</TableHead>
-            <TableHead className="w-[100px]">Date</TableHead>
+            <TableHead className="w-[30px]"></TableHead>
+            <TableHead 
+              className="w-[250px] cursor-pointer"
+              onClick={() => handleSort('title')}
+            >
+              <div className="flex items-center">
+                Title
+                {getSortIcon('title')}
+              </div>
+            </TableHead>
+            <TableHead 
+              className="w-[100px] cursor-pointer"
+              onClick={() => handleSort('priority')}
+            >
+              <div className="flex items-center">
+                Priority
+                {getSortIcon('priority')}
+              </div>
+            </TableHead>
+            <TableHead 
+              className="w-[80px] cursor-pointer"
+              onClick={() => handleSort('effort')}
+            >
+              <div className="flex items-center">
+                Effort
+                {getSortIcon('effort')}
+              </div>
+            </TableHead>
+            <TableHead 
+              className="w-[100px] cursor-pointer"
+              onClick={() => handleSort('status')}
+            >
+              <div className="flex items-center">
+                Status
+                {getSortIcon('status')}
+              </div>
+            </TableHead>
+            <TableHead 
+              className="hidden sm:table-cell w-[120px] cursor-pointer"
+              onClick={() => handleSort('customer')}
+            >
+              <div className="flex items-center">
+                Customer
+                {getSortIcon('customer')}
+              </div>
+            </TableHead>
+            <TableHead 
+              className="w-[100px] cursor-pointer"
+              onClick={() => handleSort('createdAt')}
+            >
+              <div className="flex items-center">
+                Date
+                {getSortIcon('createdAt')}
+              </div>
+            </TableHead>
             <TableHead className="w-[80px]">Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -196,42 +399,134 @@ const Ideas = () => {
             </TableRow>
           ) : (
             filteredIdeas.map((idea) => (
-              <TableRow key={idea.id}>
-                <TableCell className="font-medium">{idea.title}</TableCell>
-                <TableCell className="hidden md:table-cell">
-                  <div className="max-w-md truncate">{idea.description}</div>
-                </TableCell>
-                <TableCell>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPriorityBadgeStyle(idea.priority as 'urgent' | 'high' | 'medium' | 'low')}`}>
-                    {idea.priority.charAt(0).toUpperCase() + idea.priority.slice(1)}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getEffortBadgeStyle(idea.effort as 'xs' | 's' | 'm' | 'l' | 'xl')}`}>
-                    {idea.effort.toUpperCase()}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${idea.status === 'new' ? 'bg-purple-100 text-purple-800' : 
-                    idea.status === 'planned' ? 'bg-blue-100 text-blue-800' : 
-                    idea.status === 'completed' ? 'bg-green-100 text-green-800' : 
-                    'bg-gray-100 text-gray-800'}`}>
-                    {idea.status.charAt(0).toUpperCase() + idea.status.slice(1)}
-                  </span>
-                </TableCell>
-                <TableCell className="hidden sm:table-cell">{idea.customer}</TableCell>
-                <TableCell>{idea.createdAt}</TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                      <Pencil className="h-3.5 w-3.5" />
+              <React.Fragment key={idea.id}>
+                <TableRow className={expandedRows[idea.id] ? "border-b-0" : ""}>
+                  <TableCell className="w-[30px] pr-0">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-7 w-7 p-0"
+                      onClick={() => toggleRowExpanded(idea.id)}
+                    >
+                      <ChevronDown className={`h-4 w-4 transition-transform ${expandedRows[idea.id] ? "transform rotate-180" : ""}`} />
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
+                  </TableCell>
+                  <TableCell className="font-medium">{idea.title}</TableCell>
+                  <TableCell>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPriorityBadgeStyle(idea.priority)}`}>
+                      {idea.priority.charAt(0).toUpperCase() + idea.priority.slice(1)}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getEffortBadgeStyle(idea.effort)}`}>
+                      {idea.effort.toUpperCase()}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeStyle(idea.status)}`}>
+                      {idea.status.charAt(0).toUpperCase() + idea.status.slice(1)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell">{idea.customer}</TableCell>
+                  <TableCell>{idea.createdAt}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      <EditIdeaModal
+                        idea={idea}
+                        initiatives={mockInitiatives}
+                        customers={mockCustomers}
+                        onUpdate={handleUpdateIdea}
+                        triggerButtonSize="icon"
+                      />
+                      <div className="relative">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 w-7 p-0"
+                          onClick={() => toggleMenu(idea.id)}
+                        >
+                          <MoreHorizontal className="h-3.5 w-3.5" />
+                        </Button>
+                        
+                        {showMenu[idea.id] && (
+                          <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded shadow-lg z-10">
+                            <div 
+                              className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center"
+                              onClick={() => {
+                                console.log('Edit idea', idea.id);
+                                toggleMenu(idea.id);
+                              }}
+                            >
+                              <Pencil className="h-3.5 w-3.5 mr-2" /> Edit
+                            </div>
+                            <div 
+                              className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center"
+                              onClick={() => {
+                                console.log('View idea details', idea.id);
+                                toggleMenu(idea.id);
+                              }}
+                            >
+                              <ExternalLink className="h-3.5 w-3.5 mr-2" /> View Details
+                            </div>
+                            <div 
+                              className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center text-red-600"
+                              onClick={() => {
+                                console.log('Delete idea', idea.id);
+                                toggleMenu(idea.id);
+                              }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </TableCell>
+                </TableRow>
+                
+                {/* Expanded Row Section */}
+                {expandedRows[idea.id] && (
+                  <TableRow className="bg-slate-50">
+                    <TableCell colSpan={8} className="p-0">
+                      <div className="p-4">
+                        <div className="space-y-4">
+                          {/* Description Section */}
+                          <div>
+                            <h3 className="text-sm font-medium mb-2">Description</h3>
+                            <p className="text-sm text-slate-600">{idea.description}</p>
+                          </div>
+                          
+                          {/* Additional Details */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <h3 className="text-sm font-medium mb-2">Initiative</h3>
+                              <div className="bg-white p-2 rounded border border-slate-200">
+                                <div className="flex items-center">
+                                  <span className="text-sm">{idea.initiative}</span>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div>
+                              <h3 className="text-sm font-medium mb-2">Actions</h3>
+                              <div className="flex flex-wrap gap-2">
+                                <Button variant="outline" size="sm" className="text-xs h-8">
+                                  <ChevronRight className="h-3 w-3 mr-1" />
+                                  View Initiative
+                                </Button>
+                                <Button variant="outline" size="sm" className="text-xs h-8">
+                                  <ChevronRight className="h-3 w-3 mr-1" />
+                                  View Customer
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </React.Fragment>
             ))
           )}
         </TableBody>
@@ -246,10 +541,11 @@ const Ideas = () => {
         </div>
         <h3 className="text-lg font-medium mb-1">No ideas yet</h3>
         <p className="text-gray-500 text-center mb-4">Start collecting ideas from your team and customers to improve your product.</p>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Idea
-        </Button>
+        <AddIdeaModal 
+          onSave={handleSaveIdea} 
+          initiatives={mockInitiatives} 
+          customers={mockCustomers} 
+        />
       </div>
     )}
   </div>
