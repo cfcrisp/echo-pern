@@ -128,6 +128,7 @@ const Initiatives = () => {
       <TabsList>
         <TabsTrigger value="all">All Initiatives</TabsTrigger>
         <TabsTrigger value="active">Active</TabsTrigger>
+        <TabsTrigger value="planned">Planned</TabsTrigger>
         <TabsTrigger value="completed">Completed</TabsTrigger>
       </TabsList>
     </Tabs>
@@ -185,8 +186,8 @@ const Initiatives = () => {
         <CardHeader className="pb-2 border-b">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-purple-500"></div>
-              <span className="text-sm font-medium text-purple-600">Planning</span>
+              <div className="h-2 w-2 rounded-full bg-slate-500"></div>
+              <span className="text-sm font-medium text-slate-600">Planned</span>
             </div>
             <span className="text-xs text-gray-500">Q3 Goal</span>
           </div>

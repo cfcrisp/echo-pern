@@ -57,11 +57,11 @@ const mockInitiatives: Initiative[] = [
 const getStatusColor = (status: Initiative['status']) => {
   switch (status) {
     case 'active':
-      return 'bg-slate-100 text-slate-700';
+      return 'bg-green-100 text-green-800';
     case 'planned':
-      return 'bg-slate-50 text-slate-600';
+      return 'bg-blue-100 text-blue-800';
     case 'completed':
-      return 'bg-slate-200 text-slate-800';
+      return 'bg-gray-100 text-gray-800';
     default:
       return 'bg-slate-100 text-slate-700';
   }
