@@ -133,15 +133,15 @@ const Dashboard: React.FC = () => {
       {/* Header with breadcrumb and improved styling */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <div className="flex items-center gap-1 text-sm text-gray-500 mb-1">
-            <Link to="/" className="hover:text-gray-700">Home</Link>
+          <div className="flex items-center gap-1 text-sm text-gray-500 dark:text-muted-foreground mb-1">
+            <Link to="/" className="hover:text-gray-700 dark:hover:text-gray-300">Home</Link>
           </div>
-          <h1 className="text-2xl font-bold">Home</h1>
-          <p className="text-gray-500 mt-1">Overview of your business performance and customer insights.</p>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-foreground">Home</h1>
+          <p className="text-sm text-gray-500 dark:text-muted-foreground mt-1">Overview of your business performance and customer insights.</p>
         </div>
         <div>
           <Tabs value={timeframe} onValueChange={(value) => setTimeframe(value as any)} className="mb-0">
-            <TabsList className="bg-white border">
+            <TabsList className="bg-white dark:bg-card border dark:border-border">
               <TabsTrigger value="week">Week</TabsTrigger>
               <TabsTrigger value="month">Month</TabsTrigger>
               <TabsTrigger value="quarter">Quarter</TabsTrigger>
@@ -155,7 +155,7 @@ const Dashboard: React.FC = () => {
         {/* Customer Metric Card */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500 flex items-center">
+            <CardTitle className="text-sm font-medium text-gray-500 dark:text-muted-foreground flex items-center">
               <Users className="h-4 w-4 mr-2" />
               Customers
             </CardTitle>
@@ -164,7 +164,7 @@ const Dashboard: React.FC = () => {
             <div className="flex justify-between items-end">
               <div>
                 <div className="text-2xl font-bold">{totalCustomers}</div>
-                <p className="text-xs text-gray-500">{activeCustomers} active</p>
+                <p className="text-xs text-gray-500 dark:text-muted-foreground">{activeCustomers} active</p>
               </div>
               <div className={`flex items-center ${customerGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 {customerGrowth >= 0 ? (
@@ -181,7 +181,7 @@ const Dashboard: React.FC = () => {
         {/* Revenue Metric Card */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500 flex items-center">
+            <CardTitle className="text-sm font-medium text-gray-500 dark:text-muted-foreground flex items-center">
               <BarChart3 className="h-4 w-4 mr-2" />
               Revenue
             </CardTitle>
@@ -190,7 +190,7 @@ const Dashboard: React.FC = () => {
             <div className="flex justify-between items-end">
               <div>
                 <div className="text-2xl font-bold">${(totalRevenue / 1000).toFixed(0)}k</div>
-                <p className="text-xs text-gray-500">Total revenue</p>
+                <p className="text-xs text-gray-500 dark:text-muted-foreground">Total revenue</p>
               </div>
               <div className={`flex items-center ${revenueGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 {revenueGrowth >= 0 ? (
@@ -207,7 +207,7 @@ const Dashboard: React.FC = () => {
         {/* Ideas Metric Card */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500 flex items-center">
+            <CardTitle className="text-sm font-medium text-gray-500 dark:text-muted-foreground flex items-center">
               <Lightbulb className="h-4 w-4 mr-2" />
               Ideas
             </CardTitle>
@@ -216,7 +216,7 @@ const Dashboard: React.FC = () => {
             <div className="flex justify-between items-end">
               <div>
                 <div className="text-2xl font-bold">{totalIdeas}</div>
-                <p className="text-xs text-gray-500">{ideasData.find(i => i.status === 'new')?.count || 0} new</p>
+                <p className="text-xs text-gray-500 dark:text-muted-foreground">{ideasData.find(i => i.status === 'new')?.count || 0} new</p>
               </div>
               <div className={`flex items-center ${ideaGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 {ideaGrowth >= 0 ? (
@@ -233,7 +233,7 @@ const Dashboard: React.FC = () => {
         {/* Feedback Metric Card */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500 flex items-center">
+            <CardTitle className="text-sm font-medium text-gray-500 dark:text-muted-foreground flex items-center">
               <MessageSquare className="h-4 w-4 mr-2" />
               Feedback
             </CardTitle>
@@ -242,7 +242,7 @@ const Dashboard: React.FC = () => {
             <div className="flex justify-between items-end">
               <div>
                 <div className="text-2xl font-bold">{totalFeedback}</div>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-500 dark:text-muted-foreground">
                   {feedbackBySentiment.find(f => f.sentiment === 'positive')?.count || 0} positive
                 </p>
               </div>
@@ -392,12 +392,12 @@ const Dashboard: React.FC = () => {
                 .map(customer => (
                   <div key={customer.id} className="flex justify-between items-center">
                     <div className="flex items-center">
-                      <div className="mr-4 h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center">
-                        <Users className="h-4 w-4 text-gray-500" />
+                      <div className="mr-4 h-8 w-8 rounded-full bg-gray-100 dark:bg-muted flex items-center justify-center">
+                        <Users className="h-4 w-4 text-gray-500 dark:text-muted-foreground" />
                       </div>
                       <div>
                         <div className="text-sm font-medium">{customer.name}</div>
-                        <p className="text-xs text-gray-500">{customer.idea_count} ideas, {customer.feedback_count} feedback</p>
+                        <p className="text-xs text-gray-500 dark:text-muted-foreground">{customer.idea_count} ideas, {customer.feedback_count} feedback</p>
                       </div>
                     </div>
                     <div className="text-sm font-medium">{customer.revenue}</div>
@@ -426,12 +426,12 @@ const Dashboard: React.FC = () => {
                   <div className="text-sm font-medium">Increase Customer Retention</div>
                   <div className="text-sm font-medium">75%</div>
                 </div>
-                <div className="w-full bg-gray-100 rounded-full h-2.5">
+                <div className="w-full bg-gray-100 dark:bg-muted rounded-full h-2.5">
                   <div className="bg-purple-600 h-2.5 rounded-full" style={{ width: '75%' }}></div>
                 </div>
                 <div className="flex justify-between mt-1">
-                  <div className="text-xs text-gray-500">3 initiatives</div>
-                  <div className="text-xs text-gray-500">Target: Dec 31</div>
+                  <div className="text-xs text-gray-500 dark:text-muted-foreground">3 initiatives</div>
+                  <div className="text-xs text-gray-500 dark:text-muted-foreground">Target: Dec 31</div>
                 </div>
               </div>
               
@@ -441,12 +441,12 @@ const Dashboard: React.FC = () => {
                   <div className="text-sm font-medium">Launch Mobile Application</div>
                   <div className="text-sm font-medium">45%</div>
                 </div>
-                <div className="w-full bg-gray-100 rounded-full h-2.5">
+                <div className="w-full bg-gray-100 dark:bg-muted rounded-full h-2.5">
                   <div className="bg-purple-600 h-2.5 rounded-full" style={{ width: '45%' }}></div>
                 </div>
                 <div className="flex justify-between mt-1">
-                  <div className="text-xs text-gray-500">2 initiatives</div>
-                  <div className="text-xs text-gray-500">Target: Mar 15</div>
+                  <div className="text-xs text-gray-500 dark:text-muted-foreground">2 initiatives</div>
+                  <div className="text-xs text-gray-500 dark:text-muted-foreground">Target: Mar 15</div>
                 </div>
               </div>
               
@@ -456,12 +456,12 @@ const Dashboard: React.FC = () => {
                   <div className="text-sm font-medium">Expand to European Market</div>
                   <div className="text-sm font-medium">20%</div>
                 </div>
-                <div className="w-full bg-gray-100 rounded-full h-2.5">
+                <div className="w-full bg-gray-100 dark:bg-muted rounded-full h-2.5">
                   <div className="bg-purple-600 h-2.5 rounded-full" style={{ width: '20%' }}></div>
                 </div>
                 <div className="flex justify-between mt-1">
-                  <div className="text-xs text-gray-500">1 initiative</div>
-                  <div className="text-xs text-gray-500">Target: Jun 30</div>
+                  <div className="text-xs text-gray-500 dark:text-muted-foreground">1 initiative</div>
+                  <div className="text-xs text-gray-500 dark:text-muted-foreground">Target: Jun 30</div>
                 </div>
               </div>
             </div>

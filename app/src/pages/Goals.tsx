@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   ChevronRight, Target, Pencil, Plus, Trash2, 
-  Calendar, List, ChevronDown, MoreHorizontal 
+  Calendar, List, ChevronDown, MoreHorizontal, BarChart, Edit 
 } from 'lucide-react';
 import { AddGoalModal, EditGoalModal } from "@/components/shared";
 
@@ -65,13 +65,13 @@ const mockGoals: Goal[] = [
 const getStatusColor = (status: Goal['status']) => {
   switch (status) {
     case 'active':
-      return 'bg-green-100 text-green-800';
+      return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
     case 'planned':
-      return 'bg-blue-100 text-blue-800';
+      return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
     case 'completed':
-      return 'bg-gray-100 text-gray-800';
+      return 'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400';
     default:
-      return 'bg-slate-100 text-slate-700';
+      return 'bg-slate-100 text-slate-700 dark:bg-slate-800/50 dark:text-slate-400';
   }
 };
 
@@ -144,17 +144,17 @@ const GoalCard: React.FC<{ goal: Goal }> = ({ goal }) => {
   };
   
   return (
-    <Card className="group transition-all duration-200 hover:shadow-md border border-slate-200 overflow-hidden">
+    <Card className="group transition-all duration-200 hover:shadow-md border border-slate-200 dark:border-gray-700 overflow-hidden dark:bg-card">
       <div className="p-4">
         <div className="flex justify-between items-start">
           <div className="flex-grow">
             <div className="flex items-center mb-2">
-              <h3 className="text-lg font-medium mr-3">{goal.title}</h3>
+              <h3 className="text-lg font-medium mr-3 dark:text-gray-100">{goal.title}</h3>
               <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColor}`}>
                 {goal.status.charAt(0).toUpperCase() + goal.status.slice(1)}
               </span>
             </div>
-            <p className="text-sm text-slate-600 mb-3 line-clamp-2">
+            <p className="text-sm text-slate-600 dark:text-gray-300 mb-3 line-clamp-2">
               {goal.description}
             </p>
           </div>
@@ -176,9 +176,9 @@ const GoalCard: React.FC<{ goal: Goal }> = ({ goal }) => {
               </Button>
               
               {showMenu && (
-                <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded shadow-lg z-10">
+                <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded shadow-lg z-10 dark:bg-card dark:border-border">
                   <div 
-                    className="px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer flex items-center"
+                    className="px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer flex items-center dark:hover:bg-gray-800/50 dark:text-gray-200"
                     onClick={() => {
                       console.log('Edit goal', goal.id);
                       setShowMenu(false);
@@ -187,7 +187,7 @@ const GoalCard: React.FC<{ goal: Goal }> = ({ goal }) => {
                     <Pencil className="h-4 w-4 mr-2" /> Edit
                   </div>
                   <div 
-                    className="px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer flex items-center text-red-600"
+                    className="px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer flex items-center text-red-600 dark:hover:bg-gray-800/50"
                     onClick={() => {
                       console.log('Delete goal', goal.id);
                       setShowMenu(false);
@@ -204,18 +204,18 @@ const GoalCard: React.FC<{ goal: Goal }> = ({ goal }) => {
         <div className="flex items-center space-x-4 mt-2">
           {/* Target Date with Prominence */}
           {goal.targetDate && (
-            <div className="bg-purple-50 rounded-md px-2 py-1 flex items-center text-xs">
-              <Calendar className="h-3 w-3 mr-1 text-purple-600" />
-              <span className="font-medium text-purple-800">{formattedDate}</span>
+            <div className="bg-purple-50 dark:bg-purple-900/20 rounded-md px-2 py-1 flex items-center text-xs">
+              <Calendar className="h-3 w-3 mr-1 text-purple-600 dark:text-purple-400" />
+              <span className="font-medium text-purple-800 dark:text-purple-300">{formattedDate}</span>
               {timeRemaining && (
-                <span className="text-purple-600 ml-1"> · {timeRemaining}</span>
+                <span className="text-purple-600 dark:text-purple-400 ml-1"> · {timeRemaining}</span>
               )}
             </div>
           )}
           
           {/* Linked Initiatives */}
           {initiativesCount > 0 && (
-            <div className="flex items-center text-xs text-slate-500">
+            <div className="flex items-center text-xs text-slate-500 dark:text-gray-400">
               <List className="h-3 w-3 mr-1" />
               <span>{initiativesCount} initiatives</span>
             </div>
@@ -224,7 +224,7 @@ const GoalCard: React.FC<{ goal: Goal }> = ({ goal }) => {
           <Button 
             variant="ghost" 
             size="sm" 
-            className="ml-auto text-xs text-slate-500 p-0 h-6"
+            className="ml-auto text-xs text-slate-500 dark:text-gray-400 p-0 h-6"
             onClick={() => setExpanded(!expanded)}
           >
             {expanded ? 'Hide details' : 'Show details'}
@@ -233,60 +233,104 @@ const GoalCard: React.FC<{ goal: Goal }> = ({ goal }) => {
         </div>
         
         {expanded && (
-          <div className="mt-3 pt-3 border-t border-slate-100">
-            <p className="text-sm text-slate-600 mb-2">{goal.description}</p>
+          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-gray-700">
+            <div className="mb-4">
+              <h4 className="text-xs font-semibold mb-2 text-slate-700 dark:text-gray-300 uppercase tracking-wider">Goal Description</h4>
+              <p className="text-sm text-slate-600 dark:text-gray-300">{goal.description}</p>
+            </div>
             
             {/* Mock Initiatives related to this goal */}
             {initiativesCount > 0 && (
-              <div className="mt-3">
-                <h4 className="text-sm font-medium mb-2">Related Initiatives</h4>
-                <div className="space-y-2">
-                  {Array.from({ length: Math.min(initiativesCount, 3) }).map((_, idx) => (
-                    <div key={idx} className="bg-slate-50 p-2 rounded-md flex justify-between items-center">
-                      <div>
-                        <span className="text-xs font-medium">
-                          Initiative {idx + 1}
-                        </span>
-                        <p className="text-xs text-slate-500">
-                          {idx === 0 ? 'Redesign User Interface' : 
-                           idx === 1 ? 'Improve Customer Journey' : 'Optimize Performance'}
-                        </p>
+              <div className="mb-4">
+                <h4 className="text-xs font-semibold mb-2 text-slate-700 dark:text-gray-300 uppercase tracking-wider flex items-center">
+                  <Target className="h-3.5 w-3.5 mr-1.5 text-primary/70" />
+                  Related Initiatives ({initiativesCount})
+                </h4>
+                <div className="bg-slate-50 dark:bg-gray-800/70 p-3 rounded-lg border border-slate-200 dark:border-gray-700">
+                  <div className="space-y-2">
+                    {Array.from({ length: Math.min(initiativesCount, 3) }).map((_, idx) => (
+                      <div key={idx} className="bg-white dark:bg-gray-900/50 p-2.5 rounded-md border border-slate-200 dark:border-gray-700 hover:border-slate-300 dark:hover:border-gray-600 transition-colors">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <span className="text-xs font-medium dark:text-gray-200">
+                              {idx === 0 ? 'Redesign User Interface' : 
+                               idx === 1 ? 'Improve Customer Journey' : 'Optimize Performance'}
+                            </span>
+                            <p className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">
+                              {idx === 0 ? 'Active' : idx === 1 ? 'Planned' : 'Completed'}
+                            </p>
+                          </div>
+                          <Button variant="ghost" size="sm" className="h-6 text-xs hover:text-primary dark:hover:text-primary">
+                            <ChevronRight className="h-3 w-3 mr-1" />
+                            View
+                          </Button>
+                        </div>
                       </div>
-                      <Button variant="ghost" size="sm" className="h-6 text-xs">
-                        View
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-                
-                {initiativesCount > 3 && (
-                  <Button variant="outline" size="sm" className="w-full mt-2 text-xs h-8">
-                    View All {initiativesCount} Initiatives
+                    ))}
+                  </div>
+                  
+                  {initiativesCount > 3 && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="w-full justify-center mt-2 text-xs h-7 text-slate-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary"
+                    >
+                      <ChevronRight className="h-3 w-3 mr-1" />
+                      View All {initiativesCount} Initiatives
+                    </Button>
+                  )}
+                  
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="w-full justify-center mt-2 text-xs h-7 text-slate-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary border border-dashed border-slate-200 dark:border-gray-700"
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add New Initiative
                   </Button>
-                )}
-                
-                <Button variant="outline" size="sm" className="mt-3 h-8 text-xs">
-                  <Plus className="h-3 w-3 mr-1" />
-                  Add Initiative
-                </Button>
+                </div>
               </div>
             )}
             
             {/* Additional details section */}
-            <div className="mt-4">
-              <h4 className="text-sm font-medium mb-2">Progress</h4>
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs text-gray-600">
-                  <span>Overall Completion</span>
-                  <span>{Math.floor(Math.random() * 100)}%</span>
-                </div>
-                <div className="w-full bg-gray-100 rounded-full h-1.5">
-                  <div 
-                    className="bg-purple-500 h-1.5 rounded-full transition-all" 
-                    style={{ width: `${Math.floor(Math.random() * 100)}%` }}
-                  ></div>
+            <div className="mb-4">
+              <h4 className="text-xs font-semibold mb-2 text-slate-700 dark:text-gray-300 uppercase tracking-wider flex items-center">
+                <BarChart className="h-3.5 w-3.5 mr-1.5 text-purple-500" />
+                Progress
+              </h4>
+              <div className="bg-slate-50 dark:bg-gray-800/70 p-3 rounded-lg border border-slate-200 dark:border-gray-700">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400">
+                    <span>Overall Completion</span>
+                    <span>{Math.floor(Math.random() * 100)}%</span>
+                  </div>
+                  <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-1.5">
+                    <div 
+                      className="bg-purple-500 dark:bg-purple-400 h-1.5 rounded-full transition-all" 
+                      style={{ width: `${Math.floor(Math.random() * 100)}%` }}
+                    ></div>
+                  </div>
                 </div>
               </div>
+            </div>
+            
+            {/* Quick action buttons */}
+            <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-slate-100 dark:border-gray-700">
+              <h4 className="text-xs font-semibold text-slate-700 dark:text-gray-300 mr-2 self-center">Quick Actions:</h4>
+              {initiativesCount > 0 && (
+                <Button variant="outline" size="sm" className="h-7 text-xs">
+                  <Target className="h-3 w-3 mr-1 text-primary" />
+                  View Initiatives
+                </Button>
+              )}
+              <Button variant="outline" size="sm" className="h-7 text-xs">
+                <Plus className="h-3 w-3 mr-1 text-purple-500" />
+                Add Initiative
+              </Button>
+              <Button variant="outline" size="sm" className="h-7 text-xs">
+                <Edit className="h-3 w-3 mr-1 text-gray-500" />
+                Edit Goal
+              </Button>
             </div>
           </div>
         )}

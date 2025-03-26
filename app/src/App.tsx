@@ -11,6 +11,8 @@ import Feedback from './pages/Feedback';
 import Initiatives from './pages/Initiatives';
 import Dashboard from './pages/Home';
 import { AddInitiativeModal } from "@/components/shared";
+import { ThemeProvider } from '@/context/ThemeContext';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 // Navigation Item Component
 const NavItem = ({ icon: Icon, label, to }: { icon: React.ElementType, label: string, to: string }) => {
@@ -23,7 +25,7 @@ const NavItem = ({ icon: Icon, label, to }: { icon: React.ElementType, label: st
     to={to}
     className={`flex items-center gap-3 p-3 rounded-lg transition-all duration-200 ${isActive 
       ? 'bg-primary/10 text-primary font-medium' 
-      : 'text-gray-700 hover:bg-gray-100'}`}
+      : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800/50'}`}
   >
     <Icon className={`h-5 w-5 ${isActive ? 'text-primary' : ''}`} />
     <span>{label}</span>
@@ -48,66 +50,71 @@ function App() {
   };
 
   return (
-    <div className="flex min-h-screen w-full bg-gray-50">
-      {/* Left Navigation Panel - Fixed Full Height */}
-      <aside
-        className={`fixed top-0 bottom-0 left-0 w-64 bg-white border-r border-gray-200 p-5 flex flex-col justify-between shadow-sm h-screen z-40 ${
-          isSidebarOpen ? '' : 'hidden'
-        }`}
-      >
-        <div>
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 mb-8 px-2">
-            <div className="h-8 w-8 rounded-md bg-primary flex items-center justify-center">
-              <span className="text-white font-bold">E</span>
+    <ThemeProvider>
+      <div className="flex min-h-screen w-full bg-gray-50 dark:bg-background text-foreground">
+        {/* Left Navigation Panel - Fixed Full Height */}
+        <aside
+          className={`fixed top-0 bottom-0 left-0 w-64 bg-white dark:bg-card border-r border-gray-200 dark:border-border p-5 flex flex-col justify-between shadow-sm h-screen z-40 ${
+            isSidebarOpen ? '' : 'hidden'
+          }`}
+        >
+          <div>
+            {/* Logo */}
+            <div className="flex items-center justify-between mb-8">
+              <Link to="/" className="flex items-center gap-2 px-2">
+                <div className="h-8 w-8 rounded-md bg-primary flex items-center justify-center">
+                  <span className="text-white font-bold">E</span>
+                </div>
+                <span className="text-2xl font-bold bg-gradient-to-r from-primary to-blue-500 bg-clip-text text-transparent">Echo</span>
+              </Link>
+              <ThemeToggle />
             </div>
-            <span className="text-2xl font-bold bg-gradient-to-r from-primary to-blue-500 bg-clip-text text-transparent">Echo</span>
-          </Link>
 
-          {/* Navigation Links */}
-          <nav className="space-y-2">
-            <NavItem icon={Home} label="Home" to="/" />
-            <NavItem icon={Target} label="Goals" to="/goals" />
-            <NavItem icon={List} label="Initiatives" to="/initiatives" />
-            <NavItem icon={Users} label="Customers" to="/customers" />
-            <NavItem icon={MessageSquare} label="Feedback" to="/feedback" />
-            <NavItem icon={Lightbulb} label="Ideas" to="/ideas" />
-          </nav>
-        </div>
-
-        {/* Bottom Section (Settings and Log out) */}
-        <div className="space-y-2">
-          <NavItem icon={Settings} label="Settings" to="/settings" />
-          <NavItem icon={LogOut} label="Log out" to="/logout" />
-        </div>
-      </aside>
-
-      {/* Main Content Area - Scrollable */}
-      <main className="ml-64 flex-1 overflow-auto min-h-screen">
-        <div className="p-6 md:p-8">
-          <div className="flex items-center mb-6">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="mr-4 md:hidden" 
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            >
-              <List className="h-5 w-5" />
-            </Button>
+            {/* Navigation Links */}
+            <nav className="space-y-2">
+              <NavItem icon={Home} label="Home" to="/" />
+              <NavItem icon={Target} label="Goals" to="/goals" />
+              <NavItem icon={List} label="Initiatives" to="/initiatives" />
+              <NavItem icon={Users} label="Customers" to="/customers" />
+              <NavItem icon={MessageSquare} label="Feedback" to="/feedback" />
+              <NavItem icon={Lightbulb} label="Ideas" to="/ideas" />
+            </nav>
           </div>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/goals" element={<Goals />} />
-            <Route path="/initiatives" element={<Initiatives />} />
-            <Route path="/customers" element={<Customers />} />
-            <Route path="/feedback" element={<Feedback />} />
-            <Route path="/ideas" element={<Ideas />} />
-            {/* Add more routes in future iterations */}
-            <Route path="*" element={<Dashboard />} /> {/* Default to Home */}
-          </Routes>
-        </div>
-      </main>
-    </div>
+
+          {/* Bottom Section (Settings and Log out) */}
+          <div className="space-y-2">
+            <NavItem icon={Settings} label="Settings" to="/settings" />
+            <NavItem icon={LogOut} label="Log out" to="/logout" />
+          </div>
+        </aside>
+
+        {/* Main Content Area - Scrollable */}
+        <main className="ml-64 flex-1 overflow-auto min-h-screen">
+          <div className="p-6 md:p-8">
+            <div className="flex items-center mb-6">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="mr-4 md:hidden" 
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              >
+                <List className="h-5 w-5" />
+              </Button>
+            </div>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/goals" element={<Goals />} />
+              <Route path="/initiatives" element={<Initiatives />} />
+              <Route path="/customers" element={<Customers />} />
+              <Route path="/feedback" element={<Feedback />} />
+              <Route path="/ideas" element={<Ideas />} />
+              {/* Add more routes in future iterations */}
+              <Route path="*" element={<Dashboard />} /> {/* Default to Home */}
+            </Routes>
+          </div>
+        </main>
+      </div>
+    </ThemeProvider>
   );
 }
 

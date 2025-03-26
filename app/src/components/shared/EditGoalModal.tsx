@@ -122,9 +122,9 @@ export function EditGoalModal({ goal, onUpdate, triggerButtonSize = 'default' }:
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="planned">Planned</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="active">Active - Currently in progress</SelectItem>
+                <SelectItem value="planned">Planned - Coming up next</SelectItem>
+                <SelectItem value="completed">Completed - Finished successfully</SelectItem>
               </SelectContent>
             </Select>
           </FormItem>

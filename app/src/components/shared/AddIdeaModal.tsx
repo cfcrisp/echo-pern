@@ -128,10 +128,10 @@ export function AddIdeaModal({
                   <SelectValue placeholder="Select priority" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="urgent">Urgent</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="urgent">Urgent - Critical for business (fix now)</SelectItem>
+                  <SelectItem value="high">High - Important feature (next sprint)</SelectItem>
+                  <SelectItem value="medium">Medium - Valuable improvement</SelectItem>
+                  <SelectItem value="low">Low - Nice to have</SelectItem>
                 </SelectContent>
               </Select>
             </FormItem>
@@ -145,11 +145,11 @@ export function AddIdeaModal({
                   <SelectValue placeholder="Select effort" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="xs">XS</SelectItem>
-                  <SelectItem value="s">S</SelectItem>
-                  <SelectItem value="m">M</SelectItem>
-                  <SelectItem value="l">L</SelectItem>
-                  <SelectItem value="xl">XL</SelectItem>
+                  <SelectItem value="xs">XS - Hours (very easy)</SelectItem>
+                  <SelectItem value="s">S - Days (simple)</SelectItem>
+                  <SelectItem value="m">M - 1-2 Weeks (moderate)</SelectItem>
+                  <SelectItem value="l">L - 2-4 Weeks (complex)</SelectItem>
+                  <SelectItem value="xl">XL - Months (major project)</SelectItem>
                 </SelectContent>
               </Select>
             </FormItem>
@@ -164,10 +164,10 @@ export function AddIdeaModal({
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="new">New</SelectItem>
-                <SelectItem value="planned">Planned</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="rejected">Rejected</SelectItem>
+                <SelectItem value="new">New - Just captured</SelectItem>
+                <SelectItem value="planned">Planned - On the roadmap</SelectItem>
+                <SelectItem value="completed">Completed - Already implemented</SelectItem>
+                <SelectItem value="rejected">Rejected - Not feasible/valuable</SelectItem>
               </SelectContent>
             </Select>
           </FormItem>

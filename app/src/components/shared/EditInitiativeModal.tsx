@@ -137,9 +137,9 @@ export function EditInitiativeModal({ initiative, goals, onUpdate, triggerButton
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="planned">Planned</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="active">Active - Currently in progress</SelectItem>
+                <SelectItem value="planned">Planned - Scheduled for future work</SelectItem>
+                <SelectItem value="completed">Completed - Successfully delivered</SelectItem>
               </SelectContent>
             </Select>
           </FormItem>
@@ -153,9 +153,9 @@ export function EditInitiativeModal({ initiative, goals, onUpdate, triggerButton
                 <SelectValue placeholder="Select priority" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="1">High</SelectItem>
-                <SelectItem value="2">Medium</SelectItem>
-                <SelectItem value="3">Low</SelectItem>
+                <SelectItem value="1">High (1) - Critical for business success</SelectItem>
+                <SelectItem value="2">Medium (2) - Important but not urgent</SelectItem>
+                <SelectItem value="3">Low (3) - Desirable improvement</SelectItem>
               </SelectContent>
             </Select>
           </FormItem>
@@ -169,9 +169,9 @@ export function EditInitiativeModal({ initiative, goals, onUpdate, triggerButton
                 <SelectValue placeholder="Select a goal (optional)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">None</SelectItem>
+                <SelectItem value="none">None - Not connected to a specific goal</SelectItem>
                 {goals.map(goal => (
-                  <SelectItem key={goal.id} value={goal.id}>{goal.title}</SelectItem>
+                  <SelectItem key={goal.id} value={goal.id}>{goal.title} (Goal #{goal.id})</SelectItem>
                 ))}
               </SelectContent>
             </Select>

@@ -118,9 +118,9 @@ export function AddCustomerModal({
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-                <SelectItem value="prospect">Prospect</SelectItem>
+                <SelectItem value="active">Active - Current paying customer</SelectItem>
+                <SelectItem value="inactive">Inactive - Former customer</SelectItem>
+                <SelectItem value="prospect">Prospect - Potential future customer</SelectItem>
               </SelectContent>
             </Select>
           </FormItem>

@@ -162,10 +162,10 @@ export function EditIdeaModal({
                 <SelectValue placeholder="Select priority" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="urgent">Urgent</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="low">Low</SelectItem>
+                <SelectItem value="urgent">Urgent - Needs immediate attention</SelectItem>
+                <SelectItem value="high">High - Critical importance</SelectItem>
+                <SelectItem value="medium">Medium - Standard priority</SelectItem>
+                <SelectItem value="low">Low - Can be addressed later</SelectItem>
               </SelectContent>
             </Select>
           </FormItem>
@@ -179,11 +179,11 @@ export function EditIdeaModal({
                 <SelectValue placeholder="Select effort" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="xs">XS (1-2 days)</SelectItem>
-                <SelectItem value="s">S (3-5 days)</SelectItem>
-                <SelectItem value="m">M (1-2 weeks)</SelectItem>
-                <SelectItem value="l">L (3-4 weeks)</SelectItem>
-                <SelectItem value="xl">XL (1+ months)</SelectItem>
+                <SelectItem value="xs">XS (1-2 days) - Very quick implementation</SelectItem>
+                <SelectItem value="s">S (3-5 days) - Small task</SelectItem>
+                <SelectItem value="m">M (1-2 weeks) - Moderate complexity</SelectItem>
+                <SelectItem value="l">L (3-4 weeks) - Significant undertaking</SelectItem>
+                <SelectItem value="xl">XL (1+ months) - Major project</SelectItem>
               </SelectContent>
             </Select>
           </FormItem>
@@ -197,10 +197,10 @@ export function EditIdeaModal({
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="new">New</SelectItem>
-                <SelectItem value="planned">Planned</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="rejected">Rejected</SelectItem>
+                <SelectItem value="new">New - Recently submitted</SelectItem>
+                <SelectItem value="planned">Planned - In the roadmap</SelectItem>
+                <SelectItem value="completed">Completed - Successfully delivered</SelectItem>
+                <SelectItem value="rejected">Rejected - Not feasible or aligned</SelectItem>
               </SelectContent>
             </Select>
           </FormItem>
@@ -214,9 +214,9 @@ export function EditIdeaModal({
                 <SelectValue placeholder="Select an initiative (optional)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">None</SelectItem>
+                <SelectItem value="none">None - Not linked to any initiative</SelectItem>
                 {initiatives.map(initiative => (
-                  <SelectItem key={initiative.id} value={initiative.id}>{initiative.title}</SelectItem>
+                  <SelectItem key={initiative.id} value={initiative.id}>{initiative.title} (Initiative #{initiative.id})</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -231,9 +231,9 @@ export function EditIdeaModal({
                 <SelectValue placeholder="Select a customer (optional)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">None</SelectItem>
+                <SelectItem value="none">None - Not associated with a customer</SelectItem>
                 {customers.map(customer => (
-                  <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>
+                  <SelectItem key={customer.id} value={customer.id}>{customer.name} (Customer #{customer.id})</SelectItem>
                 ))}
               </SelectContent>
             </Select>

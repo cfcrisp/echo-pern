@@ -6,7 +6,7 @@ import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Tabl
 import { 
   ChevronRight, Lightbulb, Pencil, Plus, Trash2, 
   ChevronDown, MoreHorizontal, ExternalLink,
-  ArrowUpDown, ArrowUp, ArrowDown
+  ArrowUpDown, ArrowUp, ArrowDown, Target, Users, MessageSquare
 } from 'lucide-react';
 import { AddIdeaModal, EditIdeaModal } from "@/components/shared";
 import React from 'react';
@@ -248,15 +248,15 @@ const Ideas = () => {
   const getPriorityBadgeStyle = (priority: IdeaPriority): string => {
     switch(priority) {
       case 'urgent':
-        return 'bg-red-100 text-red-800';
+        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
       case 'high':
-        return 'bg-orange-100 text-orange-800';
+        return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400';
       case 'medium':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
       case 'low':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400';
     }
   };
 
@@ -264,17 +264,17 @@ const Ideas = () => {
   const getEffortBadgeStyle = (effort: IdeaEffort): string => {
     switch(effort) {
       case 'xs':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
       case 's':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
       case 'm':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
       case 'l':
-        return 'bg-orange-100 text-orange-800';
+        return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400';
       case 'xl':
-        return 'bg-red-100 text-red-800';
+        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400';
     }
   };
   
@@ -282,15 +282,15 @@ const Ideas = () => {
   const getStatusBadgeStyle = (status: IdeaStatus): string => {
     switch(status) {
       case 'new':
-        return 'bg-purple-100 text-purple-800';
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400';
       case 'planned':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
       case 'completed':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
       case 'rejected':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400';
     }
   };
   
@@ -449,9 +449,9 @@ const Ideas = () => {
                         </Button>
                         
                         {showMenu[idea.id] && (
-                          <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded shadow-lg z-10">
+                          <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded shadow-lg z-10 dark:bg-card dark:border-border">
                             <div 
-                              className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center"
+                              className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center dark:hover:bg-gray-800/50 dark:text-gray-200"
                               onClick={() => {
                                 console.log('Edit idea', idea.id);
                                 toggleMenu(idea.id);
@@ -460,7 +460,7 @@ const Ideas = () => {
                               <Pencil className="h-3.5 w-3.5 mr-2" /> Edit
                             </div>
                             <div 
-                              className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center"
+                              className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center dark:hover:bg-gray-800/50 dark:text-gray-200"
                               onClick={() => {
                                 console.log('View idea details', idea.id);
                                 toggleMenu(idea.id);
@@ -469,7 +469,7 @@ const Ideas = () => {
                               <ExternalLink className="h-3.5 w-3.5 mr-2" /> View Details
                             </div>
                             <div 
-                              className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center text-red-600"
+                              className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center text-red-600 dark:hover:bg-gray-800/50"
                               onClick={() => {
                                 console.log('Delete idea', idea.id);
                                 toggleMenu(idea.id);
@@ -486,40 +486,75 @@ const Ideas = () => {
                 
                 {/* Expanded Row Section */}
                 {expandedRows[idea.id] && (
-                  <TableRow className="bg-slate-50">
+                  <TableRow className="bg-slate-50 dark:bg-gray-800/50">
                     <TableCell colSpan={8} className="p-0">
                       <div className="p-4">
                         <div className="space-y-4">
-                          {/* Description Section */}
-                          <div>
-                            <h3 className="text-sm font-medium mb-2">Description</h3>
-                            <p className="text-sm text-slate-600">{idea.description}</p>
+                          {/* Description section with cleaner layout */}
+                          <div className="mb-4">
+                            <h4 className="text-xs font-semibold mb-2 text-slate-700 dark:text-gray-300 uppercase tracking-wider">Description</h4>
+                            <p className="text-sm text-slate-600 dark:text-gray-300">{idea.description}</p>
                           </div>
                           
-                          {/* Additional Details */}
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <h3 className="text-sm font-medium mb-2">Initiative</h3>
-                              <div className="bg-white p-2 rounded border border-slate-200">
-                                <div className="flex items-center">
-                                  <span className="text-sm">{idea.initiative}</span>
+                            {/* Left column */}
+                            <div className="space-y-3">
+                              <div>
+                                <h4 className="text-xs font-semibold mb-2 text-slate-700 dark:text-gray-300 uppercase tracking-wider">Initiative</h4>
+                                <div className="bg-slate-50 dark:bg-gray-800/70 p-3 rounded-lg border border-slate-200 dark:border-gray-700 hover:border-slate-300 dark:hover:border-gray-600 transition-colors">
+                                  <div className="flex items-center">
+                                    <Target className="h-3.5 w-3.5 mr-2 text-primary/70 dark:text-primary/50" />
+                                    <p className="text-sm font-medium dark:text-gray-200">{idea.initiative}</p>
+                                  </div>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="w-full justify-start mt-2 text-xs h-7 text-slate-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary"
+                                  >
+                                    <ChevronRight className="h-3 w-3 mr-1" />
+                                    View Initiative Details
+                                  </Button>
                                 </div>
                               </div>
                             </div>
                             
-                            <div>
-                              <h3 className="text-sm font-medium mb-2">Actions</h3>
-                              <div className="flex flex-wrap gap-2">
-                                <Button variant="outline" size="sm" className="text-xs h-8">
-                                  <ChevronRight className="h-3 w-3 mr-1" />
-                                  View Initiative
-                                </Button>
-                                <Button variant="outline" size="sm" className="text-xs h-8">
-                                  <ChevronRight className="h-3 w-3 mr-1" />
-                                  View Customer
-                                </Button>
+                            {/* Right column - Customer info */}
+                            <div className="space-y-3">
+                              <div>
+                                <h4 className="text-xs font-semibold mb-2 text-slate-700 dark:text-gray-300 uppercase tracking-wider">Customer</h4>
+                                <div className="bg-slate-50 dark:bg-gray-800/70 p-3 rounded-lg border border-slate-200 dark:border-gray-700 hover:border-slate-300 dark:hover:border-gray-600 transition-colors">
+                                  <div className="flex items-center">
+                                    <Users className="h-3.5 w-3.5 mr-2 text-blue-500/70 dark:text-blue-400/50" />
+                                    <p className="text-sm font-medium dark:text-gray-200">{idea.customer}</p>
+                                  </div>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="w-full justify-start mt-2 text-xs h-7 text-slate-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary"
+                                  >
+                                    <ChevronRight className="h-3 w-3 mr-1" />
+                                    View Customer Details
+                                  </Button>
+                                </div>
                               </div>
                             </div>
+                          </div>
+                          
+                          {/* Quick action buttons */}
+                          <div className="flex flex-wrap gap-2 mt-2 pt-3 border-t border-slate-100 dark:border-gray-700">
+                            <h4 className="text-xs font-semibold text-slate-700 dark:text-gray-300 mr-2 self-center">Quick Actions:</h4>
+                            <Button variant="outline" size="sm" className="h-7 text-xs">
+                              <Target className="h-3 w-3 mr-1 text-primary" />
+                              View Initiative
+                            </Button>
+                            <Button variant="outline" size="sm" className="h-7 text-xs">
+                              <Users className="h-3 w-3 mr-1 text-blue-500" />
+                              View Customer
+                            </Button>
+                            <Button variant="outline" size="sm" className="h-7 text-xs">
+                              <MessageSquare className="h-3 w-3 mr-1 text-blue-500" />
+                              Add Feedback
+                            </Button>
                           </div>
                         </div>
                       </div>
@@ -535,12 +570,12 @@ const Ideas = () => {
     
     {/* Empty state - will be shown conditionally in a real implementation */}
     {filteredIdeas.length === 0 && (
-      <div className="flex flex-col items-center justify-center py-12 px-4 border-2 border-dashed border-gray-300 rounded-lg mt-6">
-        <div className="bg-gray-100 p-3 rounded-full mb-4">
-          <Lightbulb className="h-6 w-6 text-gray-500" />
+      <div className="flex flex-col items-center justify-center py-12 px-4 border-2 border-dashed border-gray-300 rounded-lg mt-6 dark:border-gray-700">
+        <div className="bg-gray-100 p-3 rounded-full mb-4 dark:bg-gray-800">
+          <Lightbulb className="h-6 w-6 text-gray-500 dark:text-gray-400" />
         </div>
-        <h3 className="text-lg font-medium mb-1">No ideas yet</h3>
-        <p className="text-gray-500 text-center mb-4">Start collecting ideas from your team and customers to improve your product.</p>
+        <h3 className="text-lg font-medium mb-1 dark:text-gray-200">No ideas yet</h3>
+        <p className="text-gray-500 text-center mb-4 dark:text-gray-400">Start collecting ideas from your team and customers to improve your product.</p>
         <AddIdeaModal 
           onSave={handleSaveIdea} 
           initiatives={mockInitiatives} 

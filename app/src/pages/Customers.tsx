@@ -274,13 +274,13 @@ const Customers = () => {
   const getStatusBadgeStyle = (status: CustomerStatus): string => {
     switch(status) {
       case 'active':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
       case 'inactive':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400';
       case 'prospect':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400';
     }
   };
   
@@ -288,13 +288,13 @@ const Customers = () => {
   const getPriorityBadgeStyle = (priority: string): string => {
     switch(priority) {
       case 'high':
-        return 'bg-red-100 text-red-800';
+        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
       case 'medium':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
       case 'low':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400';
     }
   };
   
@@ -302,13 +302,13 @@ const Customers = () => {
   const getSentimentBadgeStyle = (sentiment: string): string => {
     switch(sentiment) {
       case 'positive':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
       case 'neutral':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400';
       case 'negative':
-        return 'bg-red-100 text-red-800';
+        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400';
     }
   };
   
@@ -436,21 +436,21 @@ const Customers = () => {
                   <TableCell>
                     {customer.idea_count > 0 ? (
                       <div className="flex items-center">
-                        <Lightbulb className="h-3.5 w-3.5 mr-1 text-gray-500" />
+                        <Lightbulb className="h-3.5 w-3.5 mr-1 text-amber-500 dark:text-amber-400" />
                         <span>{customer.idea_count}</span>
                       </div>
                     ) : (
-                      <span className="text-gray-400">0</span>
+                      <span className="text-gray-400 dark:text-gray-500">0</span>
                     )}
                   </TableCell>
                   <TableCell>
                     {customer.feedback_count > 0 ? (
                       <div className="flex items-center">
-                        <MessageSquare className="h-3.5 w-3.5 mr-1 text-gray-500" />
+                        <MessageSquare className="h-3.5 w-3.5 mr-1 text-blue-500 dark:text-blue-400" />
                         <span>{customer.feedback_count}</span>
                       </div>
                     ) : (
-                      <span className="text-gray-400">0</span>
+                      <span className="text-gray-400 dark:text-gray-500">0</span>
                     )}
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">{customer.createdAt}</TableCell>
@@ -472,9 +472,9 @@ const Customers = () => {
                         </Button>
                         
                         {showMenu[customer.id] && (
-                          <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded shadow-lg z-10">
+                          <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded shadow-lg z-10 dark:bg-card dark:border-border">
                             <div 
-                              className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center"
+                              className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center dark:hover:bg-gray-800/50 dark:text-gray-200"
                               onClick={() => {
                                 console.log('Edit customer', customer.id);
                                 toggleMenu(customer.id);
@@ -483,7 +483,7 @@ const Customers = () => {
                               <Pencil className="h-3.5 w-3.5 mr-2" /> Edit
                             </div>
                             <div 
-                              className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center"
+                              className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center dark:hover:bg-gray-800/50 dark:text-gray-200"
                               onClick={() => {
                                 console.log('View customer details', customer.id);
                                 toggleMenu(customer.id);
@@ -492,7 +492,7 @@ const Customers = () => {
                               <ExternalLink className="h-3.5 w-3.5 mr-2" /> View Details
                             </div>
                             <div 
-                              className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center text-red-600"
+                              className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center text-red-600 dark:hover:bg-gray-800/50"
                               onClick={() => {
                                 console.log('Delete customer', customer.id);
                                 toggleMenu(customer.id);
@@ -509,94 +509,137 @@ const Customers = () => {
                 
                 {/* Expanded Row Section */}
                 {expandedRows[customer.id] && (
-                  <TableRow className="bg-slate-50">
+                  <TableRow className="bg-slate-50 dark:bg-gray-800/50">
                     <TableCell colSpan={8} className="p-0">
                       <div className="p-4">
-                        <div className="flex space-x-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {/* Ideas Section */}
                           {customer.ideas && customer.ideas.length > 0 && (
-                            <div className="flex-1">
-                              <h3 className="text-sm font-medium mb-2 flex items-center">
-                                <Lightbulb className="h-4 w-4 mr-1 text-yellow-500" />
+                            <div className="space-y-3">
+                              <h4 className="text-xs font-semibold text-slate-700 dark:text-gray-300 uppercase tracking-wider flex items-center">
+                                <Lightbulb className="h-3.5 w-3.5 mr-1.5 text-amber-500" />
                                 Ideas ({customer.ideas.length})
-                              </h3>
-                              <div className="space-y-2">
-                                {customer.ideas.map(idea => (
-                                  <div key={idea.id} className="bg-white p-2 rounded border border-slate-200 flex justify-between items-center">
-                                    <div>
-                                      <div className="flex items-center gap-2 mb-1">
-                                        <span className="text-xs font-medium">{idea.title}</span>
+                              </h4>
+                              <div className="bg-slate-50 dark:bg-gray-800/70 p-3 rounded-lg border border-slate-200 dark:border-gray-700">
+                                <div className="space-y-2">
+                                  {customer.ideas.map(idea => (
+                                    <div key={idea.id} className="bg-white dark:bg-gray-900/50 p-2.5 rounded-md border border-slate-200 dark:border-gray-700 hover:border-slate-300 dark:hover:border-gray-600 transition-colors">
+                                      <div className="flex items-center justify-between mb-1">
+                                        <span className="text-xs font-medium dark:text-gray-200">{idea.title}</span>
                                         <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ${getPriorityBadgeStyle(idea.priority)}`}>
                                           {idea.priority}
                                         </span>
                                       </div>
-                                      <span className="text-xs text-slate-500">Status: {idea.status}</span>
+                                      <div className="flex justify-between items-center">
+                                        <span className="text-xs text-slate-500 dark:text-gray-400">Status: {idea.status}</span>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="sm" 
+                                          className="h-6 text-xs hover:text-primary dark:hover:text-primary"
+                                        >
+                                          <ChevronRight className="h-3 w-3 mr-1" />
+                                          View
+                                        </Button>
+                                      </div>
                                     </div>
-                                    <Button variant="ghost" size="sm" className="h-6 text-xs">
-                                      View
-                                    </Button>
-                                  </div>
-                                ))}
+                                  ))}
+                                </div>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="w-full justify-center mt-2 text-xs h-7 text-slate-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary border border-dashed border-slate-200 dark:border-gray-700"
+                                >
+                                  <Plus className="h-3 w-3 mr-1" />
+                                  Add New Idea
+                                </Button>
                               </div>
-                              <Button variant="outline" size="sm" className="mt-2 h-7 text-xs">
-                                <Plus className="h-3 w-3 mr-1" />
-                                Add Idea
-                              </Button>
                             </div>
                           )}
                           
                           {/* Feedback Section */}
                           {customer.feedback && customer.feedback.length > 0 && (
-                            <div className="flex-1">
-                              <h3 className="text-sm font-medium mb-2 flex items-center">
-                                <MessageSquare className="h-4 w-4 mr-1 text-blue-500" />
+                            <div className="space-y-3">
+                              <h4 className="text-xs font-semibold text-slate-700 dark:text-gray-300 uppercase tracking-wider flex items-center">
+                                <MessageSquare className="h-3.5 w-3.5 mr-1.5 text-blue-500" />
                                 Feedback ({customer.feedback.length})
-                              </h3>
-                              <div className="space-y-2">
-                                {customer.feedback.map(feedback => (
-                                  <div key={feedback.id} className="bg-white p-2 rounded border border-slate-200 flex justify-between items-center">
-                                    <div>
-                                      <div className="flex items-center gap-2 mb-1">
-                                        <span className="text-xs font-medium">{feedback.title}</span>
+                              </h4>
+                              <div className="bg-slate-50 dark:bg-gray-800/70 p-3 rounded-lg border border-slate-200 dark:border-gray-700">
+                                <div className="space-y-2">
+                                  {customer.feedback.map(feedback => (
+                                    <div key={feedback.id} className="bg-white dark:bg-gray-900/50 p-2.5 rounded-md border border-slate-200 dark:border-gray-700 hover:border-slate-300 dark:hover:border-gray-600 transition-colors">
+                                      <div className="flex items-center justify-between mb-1">
+                                        <span className="text-xs font-medium dark:text-gray-200">{feedback.title}</span>
                                         <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ${getSentimentBadgeStyle(feedback.sentiment)}`}>
                                           {feedback.sentiment}
                                         </span>
                                       </div>
-                                      <span className="text-xs text-slate-500">
-                                        {new Date(feedback.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
-                                      </span>
+                                      <div className="flex justify-between items-center">
+                                        <span className="text-xs text-slate-500 dark:text-gray-400">
+                                          {new Date(feedback.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                                        </span>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="sm" 
+                                          className="h-6 text-xs hover:text-primary dark:hover:text-primary"
+                                        >
+                                          <ChevronRight className="h-3 w-3 mr-1" />
+                                          View
+                                        </Button>
+                                      </div>
                                     </div>
-                                    <Button variant="ghost" size="sm" className="h-6 text-xs">
-                                      View
-                                    </Button>
-                                  </div>
-                                ))}
+                                  ))}
+                                </div>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="w-full justify-center mt-2 text-xs h-7 text-slate-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary border border-dashed border-slate-200 dark:border-gray-700"
+                                >
+                                  <Plus className="h-3 w-3 mr-1" />
+                                  Add New Feedback
+                                </Button>
                               </div>
-                              <Button variant="outline" size="sm" className="mt-2 h-7 text-xs">
-                                <Plus className="h-3 w-3 mr-1" />
-                                Add Feedback
-                              </Button>
                             </div>
                           )}
                           
                           {/* Empty state - if customer has no ideas and feedback */}
                           {(!customer.ideas || customer.ideas.length === 0) && 
                            (!customer.feedback || customer.feedback.length === 0) && (
-                            <div className="w-full text-center py-6">
-                              <p className="text-sm text-gray-500">No ideas or feedback available for this customer.</p>
-                              <div className="flex justify-center gap-2 mt-2">
+                            <div className="col-span-2 bg-slate-50 dark:bg-gray-800/70 p-6 rounded-lg border border-slate-200 dark:border-gray-700 text-center">
+                              <Users className="h-8 w-8 mx-auto mb-2 text-gray-400 dark:text-gray-500" />
+                              <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">No ideas or feedback available for this customer.</p>
+                              <div className="flex justify-center gap-2">
                                 <Button variant="outline" size="sm" className="h-7 text-xs">
-                                  <Plus className="h-3 w-3 mr-1" />
+                                  <Lightbulb className="h-3 w-3 mr-1 text-amber-500" />
                                   Add Idea
                                 </Button>
                                 <Button variant="outline" size="sm" className="h-7 text-xs">
-                                  <Plus className="h-3 w-3 mr-1" />
+                                  <MessageSquare className="h-3 w-3 mr-1 text-blue-500" />
                                   Add Feedback
                                 </Button>
                               </div>
                             </div>
                           )}
                         </div>
+                        
+                        {/* Quick actions - only show if customer has ideas or feedback */}
+                        {(Array.isArray(customer.ideas) && customer.ideas.length > 0) || 
+                         (Array.isArray(customer.feedback) && customer.feedback.length > 0) ? (
+                          <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-slate-100 dark:border-gray-700">
+                            <h4 className="text-xs font-semibold text-slate-700 dark:text-gray-300 mr-2 self-center">Quick Actions:</h4>
+                            <Button variant="outline" size="sm" className="h-7 text-xs">
+                              <Users className="h-3 w-3 mr-1 text-primary" />
+                              View Profile
+                            </Button>
+                            <Button variant="outline" size="sm" className="h-7 text-xs">
+                              <Lightbulb className="h-3 w-3 mr-1 text-amber-500" />
+                              Add Idea
+                            </Button>
+                            <Button variant="outline" size="sm" className="h-7 text-xs">
+                              <MessageSquare className="h-3 w-3 mr-1 text-blue-500" />
+                              Add Feedback
+                            </Button>
+                          </div>
+                        ) : null}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -610,12 +653,12 @@ const Customers = () => {
     
     {/* Empty state - will be shown conditionally in a real implementation */}
     {filteredCustomers.length === 0 && (
-      <div className="flex flex-col items-center justify-center py-12 px-4 border-2 border-dashed border-gray-300 rounded-lg mt-6">
-        <div className="bg-gray-100 p-3 rounded-full mb-4">
-          <Users className="h-6 w-6 text-gray-500" />
+      <div className="flex flex-col items-center justify-center py-12 px-4 border-2 border-dashed border-gray-300 rounded-lg mt-6 dark:border-gray-700">
+        <div className="bg-gray-100 p-3 rounded-full mb-4 dark:bg-gray-800">
+          <Users className="h-6 w-6 text-gray-500 dark:text-gray-400" />
         </div>
-        <h3 className="text-lg font-medium mb-1">No customers yet</h3>
-        <p className="text-gray-500 text-center mb-4">Start adding customers to track their feedback and ideas.</p>
+        <h3 className="text-lg font-medium mb-1 dark:text-gray-200">No customers yet</h3>
+        <p className="text-gray-500 text-center mb-4 dark:text-gray-400">Start adding customers to track their feedback and ideas.</p>
         <AddCustomerModal onSave={handleSaveCustomer} />
       </div>
     )}

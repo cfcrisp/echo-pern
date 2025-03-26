@@ -116,9 +116,9 @@ export function AddFeedbackModal({
                 <SelectValue placeholder="Select sentiment" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="positive">Positive</SelectItem>
-                <SelectItem value="neutral">Neutral</SelectItem>
-                <SelectItem value="negative">Negative</SelectItem>
+                <SelectItem value="positive">Positive - Favorable feedback or praise</SelectItem>
+                <SelectItem value="neutral">Neutral - Balanced or informational</SelectItem>
+                <SelectItem value="negative">Negative - Complaints or issues</SelectItem>
               </SelectContent>
             </Select>
           </FormItem>

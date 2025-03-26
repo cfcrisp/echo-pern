@@ -151,9 +151,9 @@ export function EditFeedbackModal({
                 <SelectValue placeholder="Select sentiment" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="positive">Positive</SelectItem>
-                <SelectItem value="neutral">Neutral</SelectItem>
-                <SelectItem value="negative">Negative</SelectItem>
+                <SelectItem value="positive">Positive - Favorable feedback or praise</SelectItem>
+                <SelectItem value="neutral">Neutral - Balanced or informational</SelectItem>
+                <SelectItem value="negative">Negative - Complaints or issues</SelectItem>
               </SelectContent>
             </Select>
           </FormItem>
@@ -167,9 +167,9 @@ export function EditFeedbackModal({
                 <SelectValue placeholder="Select a customer (optional)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">None</SelectItem>
+                <SelectItem value="none">None - General feedback (not customer-specific)</SelectItem>
                 {customers.map(customer => (
-                  <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>
+                  <SelectItem key={customer.id} value={customer.id}>{customer.name} (Customer #{customer.id})</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -184,9 +184,9 @@ export function EditFeedbackModal({
                 <SelectValue placeholder="Select an initiative (optional)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">None</SelectItem>
+                <SelectItem value="none">None - Not related to a specific initiative</SelectItem>
                 {initiatives.map(initiative => (
-                  <SelectItem key={initiative.id} value={initiative.id}>{initiative.title}</SelectItem>
+                  <SelectItem key={initiative.id} value={initiative.id}>{initiative.title} (Initiative #{initiative.id})</SelectItem>
                 ))}
               </SelectContent>
             </Select>

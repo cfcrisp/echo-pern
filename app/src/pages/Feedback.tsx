@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { 
   ChevronRight, MessageSquare, Pencil, Plus, Trash2,
   ChevronDown, MoreHorizontal, ExternalLink,
-  ArrowUpDown, ArrowUp, ArrowDown
+  ArrowUpDown, ArrowUp, ArrowDown, Users, Lightbulb, Target
 } from 'lucide-react';
 import { AddFeedbackModal, EditFeedbackModal } from "@/components/shared";
 
@@ -87,13 +87,13 @@ const mockFeedbackData: FeedbackItem[] = [
 const getSentimentColor = (sentiment: Sentiment) => {
   switch (sentiment) {
     case 'positive':
-      return 'bg-green-100 text-green-700';
+      return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
     case 'neutral':
-      return 'bg-slate-100 text-slate-700';
+      return 'bg-slate-100 text-slate-700 dark:bg-slate-800/50 dark:text-slate-400';
     case 'negative':
-      return 'bg-red-100 text-red-700';
+      return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
     default:
-      return 'bg-slate-100 text-slate-700';
+      return 'bg-slate-100 text-slate-700 dark:bg-slate-800/50 dark:text-slate-400';
   }
 };
 
@@ -218,12 +218,12 @@ const Feedback: React.FC = () => {
       
       {/* Empty state - will be shown conditionally when there's no feedback */}
       {filteredFeedback.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-12 px-4 border-2 border-dashed border-gray-300 rounded-lg mt-6">
-          <div className="bg-gray-100 p-3 rounded-full mb-4">
-            <MessageSquare className="h-6 w-6 text-gray-500" />
+        <div className="flex flex-col items-center justify-center py-12 px-4 border-2 border-dashed border-gray-300 rounded-lg mt-6 dark:border-gray-700">
+          <div className="bg-gray-100 p-3 rounded-full mb-4 dark:bg-gray-800">
+            <MessageSquare className="h-6 w-6 text-gray-500 dark:text-gray-400" />
           </div>
-          <h3 className="text-lg font-medium mb-1">No feedback yet</h3>
-          <p className="text-gray-500 text-center mb-4">Start collecting feedback from your customers to improve your product.</p>
+          <h3 className="text-lg font-medium mb-1 dark:text-gray-200">No feedback yet</h3>
+          <p className="text-gray-500 text-center mb-4 dark:text-gray-400">Start collecting feedback from your customers to improve your product.</p>
           <AddFeedbackModal 
             onSave={handleSaveFeedback} 
             customers={mockCustomers}
@@ -405,9 +405,9 @@ const FeedbackTable: React.FC<{
                         </Button>
                         
                         {showMenu[item.id] && (
-                          <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded shadow-lg z-10">
+                          <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded shadow-lg z-10 dark:bg-card dark:border-border">
                             <div 
-                              className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center"
+                              className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center dark:hover:bg-gray-800/50 dark:text-gray-200"
                               onClick={() => {
                                 console.log('Edit feedback', item.id);
                                 toggleMenu(item.id);
@@ -416,7 +416,7 @@ const FeedbackTable: React.FC<{
                               <Pencil className="h-3.5 w-3.5 mr-2" /> Edit
                             </div>
                             <div 
-                              className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center"
+                              className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center dark:hover:bg-gray-800/50 dark:text-gray-200"
                               onClick={() => {
                                 console.log('View feedback details', item.id);
                                 toggleMenu(item.id);
@@ -425,7 +425,7 @@ const FeedbackTable: React.FC<{
                               <ExternalLink className="h-3.5 w-3.5 mr-2" /> View Details
                             </div>
                             <div 
-                              className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center text-red-600"
+                              className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center text-red-600 dark:hover:bg-gray-800/50"
                               onClick={() => {
                                 console.log('Delete feedback', item.id);
                                 toggleMenu(item.id);
@@ -442,40 +442,73 @@ const FeedbackTable: React.FC<{
                 
                 {/* Expanded Row Section */}
                 {expandedRows[item.id] && (
-                  <TableRow className="bg-slate-50">
+                  <TableRow className="bg-slate-50 dark:bg-gray-800/50">
                     <TableCell colSpan={6} className="p-0">
                       <div className="p-4">
                         <div className="space-y-4">
-                          {/* Description Section */}
-                          <div>
-                            <h3 className="text-sm font-medium mb-2">Description</h3>
-                            <p className="text-sm text-slate-600">{item.description}</p>
+                          {/* Description section with cleaner layout */}
+                          <div className="mb-4">
+                            <h4 className="text-xs font-semibold mb-2 text-slate-700 dark:text-gray-300 uppercase tracking-wider">Feedback Details</h4>
+                            <p className="text-sm text-slate-600 dark:text-gray-300">{item.description}</p>
                           </div>
                           
-                          {/* Additional Actions */}
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <h3 className="text-sm font-medium mb-2">Customer Details</h3>
-                              <div className="bg-white p-2 rounded border border-slate-200">
-                                <div className="flex items-center">
-                                  <span className="text-sm">{item.customer}</span>
+                            {/* Left column - Customer info */}
+                            <div className="space-y-3">
+                              <div>
+                                <h4 className="text-xs font-semibold mb-2 text-slate-700 dark:text-gray-300 uppercase tracking-wider">Customer</h4>
+                                <div className="bg-slate-50 dark:bg-gray-800/70 p-3 rounded-lg border border-slate-200 dark:border-gray-700 hover:border-slate-300 dark:hover:border-gray-600 transition-colors">
+                                  <div className="flex items-center">
+                                    <Users className="h-3.5 w-3.5 mr-2 text-blue-500/70 dark:text-blue-400/50" />
+                                    <p className="text-sm font-medium dark:text-gray-200">{item.customer}</p>
+                                  </div>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="w-full justify-start mt-2 text-xs h-7 text-slate-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary"
+                                  >
+                                    <ChevronRight className="h-3 w-3 mr-1" />
+                                    View Customer Details
+                                  </Button>
                                 </div>
                               </div>
                             </div>
                             
-                            <div>
-                              <h3 className="text-sm font-medium mb-2">Actions</h3>
-                              <div className="flex flex-wrap gap-2">
-                                <Button variant="outline" size="sm" className="text-xs h-8">
-                                  <ChevronRight className="h-3 w-3 mr-1" />
-                                  View Customer
-                                </Button>
-                                <Button variant="outline" size="sm" className="text-xs h-8">
-                                  <Plus className="h-3 w-3 mr-1" />
-                                  Create Idea
-                                </Button>
+                            {/* Right column - Sentiment info */}
+                            <div className="space-y-3">
+                              <div>
+                                <h4 className="text-xs font-semibold mb-2 text-slate-700 dark:text-gray-300 uppercase tracking-wider">Sentiment Analysis</h4>
+                                <div className="bg-slate-50 dark:bg-gray-800/70 p-3 rounded-lg border border-slate-200 dark:border-gray-700 hover:border-slate-300 dark:hover:border-gray-600 transition-colors">
+                                  <div className="flex items-center">
+                                    <div className={`mr-3 px-2 py-1 text-xs font-medium rounded-full ${getSentimentColor(item.sentiment)}`}>
+                                      {item.sentiment.charAt(0).toUpperCase() + item.sentiment.slice(1)}
+                                    </div>
+                                    <p className="text-sm text-slate-600 dark:text-gray-300">
+                                      {item.sentiment === 'positive' ? 'Customer is satisfied' :
+                                       item.sentiment === 'negative' ? 'Customer is dissatisfied' :
+                                       'Customer has mixed or neutral feelings'}
+                                    </p>
+                                  </div>
+                                </div>
                               </div>
                             </div>
+                          </div>
+                          
+                          {/* Quick action buttons */}
+                          <div className="flex flex-wrap gap-2 mt-2 pt-3 border-t border-slate-100 dark:border-gray-700">
+                            <h4 className="text-xs font-semibold text-slate-700 dark:text-gray-300 mr-2 self-center">Quick Actions:</h4>
+                            <Button variant="outline" size="sm" className="h-7 text-xs">
+                              <Users className="h-3 w-3 mr-1 text-blue-500" />
+                              View Customer
+                            </Button>
+                            <Button variant="outline" size="sm" className="h-7 text-xs">
+                              <Lightbulb className="h-3 w-3 mr-1 text-amber-500" />
+                              Create Idea
+                            </Button>
+                            <Button variant="outline" size="sm" className="h-7 text-xs">
+                              <Target className="h-3 w-3 mr-1 text-primary" />
+                              Link to Initiative
+                            </Button>
                           </div>
                         </div>
                       </div>

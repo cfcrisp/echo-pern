@@ -114,12 +114,15 @@ export function AddInitiativeModal({
                   <SelectValue placeholder="Select a goal (optional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
+                  <SelectItem value="none">None - Not connected to a specific goal</SelectItem>
                   {goals.map(goal => (
-                    <SelectItem key={goal.id} value={goal.id}>{goal.title}</SelectItem>
+                    <SelectItem key={goal.id} value={goal.id}>{goal.title} (Goal #{goal.id})</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Connecting to a goal helps track progress toward strategic objectives
+              </p>
             </FormItem>
           )}
           <FormItem>
@@ -132,9 +135,9 @@ export function AddInitiativeModal({
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="planned">Planned</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="active">Active - Currently in progress</SelectItem>
+                <SelectItem value="planned">Planned - Scheduled for future work</SelectItem>
+                <SelectItem value="completed">Completed - Successfully delivered</SelectItem>
               </SelectContent>
             </Select>
           </FormItem>
@@ -148,13 +151,16 @@ export function AddInitiativeModal({
                 <SelectValue placeholder="Select priority" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="1">High (1)</SelectItem>
-                <SelectItem value="2">Medium (2)</SelectItem>
-                <SelectItem value="3">Low (3)</SelectItem>
-                <SelectItem value="4">Very Low (4)</SelectItem>
-                <SelectItem value="5">Minimal (5)</SelectItem>
+                <SelectItem value="1">High (1) - Critical for business success</SelectItem>
+                <SelectItem value="2">Medium (2) - Important but not urgent</SelectItem>
+                <SelectItem value="3">Low (3) - Desirable improvement</SelectItem>
+                <SelectItem value="4">Very Low (4) - Minor enhancement</SelectItem>
+                <SelectItem value="5">Minimal (5) - Nice to have</SelectItem>
               </SelectContent>
             </Select>
+            <p className="text-xs text-muted-foreground mt-1">
+              Example high priority initiatives: "Redesign User Interface", "Implement Analytics Dashboard"
+            </p>
           </FormItem>
         </div>
         <DialogFooter>
