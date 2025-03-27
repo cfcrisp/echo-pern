@@ -5,6 +5,7 @@ const express = require('express');
 const { TenantModel } = require('../models');
 const pool = require('../config/database');
 const authService = require('../services/authService');
+const tenantService = require('../services/tenantService');
 const { NODE_ENV } = require('../config/environment');
 
 const router = express.Router();
@@ -30,6 +31,13 @@ router.post('/initialize', async (req, res) => {
     if (!domain_name || !admin_email || !admin_password) {
       return res.status(400).json({ 
         error: 'Domain name, admin email, and admin password are required'
+      });
+    }
+    
+    // Check if domain is restricted
+    if (tenantService.isRestrictedDomain(domain_name)) {
+      return res.status(400).json({
+        error: `Cannot create tenant using public email domain '${domain_name}'. Please use a business or organization domain.`
       });
     }
     

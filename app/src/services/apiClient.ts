@@ -54,7 +54,10 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
     // Handle HTTP errors
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `API error: ${response.status}`);
+      // Pass through the actual error message from the API if available
+      const errorMessage = errorData.error || `API error: ${response.status}`;
+      console.error(`API error: ${errorMessage}`);
+      throw new Error(errorMessage);
     }
     
     return await response.json();

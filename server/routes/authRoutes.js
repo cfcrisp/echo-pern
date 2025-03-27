@@ -62,6 +62,10 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: error.message });
     }
     
+    if (error.message.includes('Cannot create tenant using public email domain')) {
+      return res.status(400).json({ error: error.message });
+    }
+    
     res.status(500).json({ error: 'Server error' });
   }
 });

@@ -7,6 +7,22 @@ const pool = require('../config/database');
 // Create tenant model instance
 const tenantModel = new TenantModel(pool);
 
+// List of restricted domains that cannot be used as tenants
+const RESTRICTED_DOMAINS = [
+  'gmail.com',
+  'yahoo.com',
+  'hotmail.com',
+  'outlook.com',
+  'aol.com',
+  'icloud.com',
+  'mail.com',
+  'protonmail.com',
+  'zoho.com',
+  'yandex.com',
+  'live.com',
+  'msn.com'
+];
+
 /**
  * Extract domain from an email address
  * @param {String} email - The email address
@@ -29,6 +45,15 @@ function extractDomainFromEmail(email) {
 }
 
 /**
+ * Check if domain is restricted from being used as a tenant
+ * @param {String} domain - The domain to check
+ * @returns {Boolean} True if domain is restricted, false otherwise
+ */
+function isRestrictedDomain(domain) {
+  return RESTRICTED_DOMAINS.includes(domain.toLowerCase());
+}
+
+/**
  * Find or create a tenant based on email domain
  * @param {String} email - The user's email address
  * @returns {Promise<Object>} The tenant object
@@ -37,6 +62,11 @@ async function findOrCreateTenantFromEmail(email) {
   try {
     // Extract domain from email
     const domain = extractDomainFromEmail(email);
+    
+    // Check if this is a restricted domain
+    if (isRestrictedDomain(domain)) {
+      throw new Error(`Cannot create tenant using public email domain '${domain}'. Please use a business or organization email.`);
+    }
     
     // Check if a tenant with this domain already exists
     let tenant = await tenantModel.findByDomain(domain);
@@ -76,5 +106,6 @@ async function getTenantForEmail(email) {
 module.exports = {
   extractDomainFromEmail,
   findOrCreateTenantFromEmail,
-  getTenantForEmail
+  getTenantForEmail,
+  isRestrictedDomain
 }; 

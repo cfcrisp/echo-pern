@@ -5,6 +5,7 @@ const express = require('express');
 const { TenantModel } = require('../models');
 const pool = require('../config/database');
 const { authenticate, requireAdmin } = require('../middleware/auth');
+const tenantService = require('../services/tenantService');
 
 const router = express.Router();
 const tenantModel = new TenantModel(pool);
@@ -51,6 +52,15 @@ router.get('/:id', authenticate, requireAdmin, async (req, res) => {
  */
 router.post('/', authenticate, requireAdmin, async (req, res) => {
   try {
+    const { domain_name } = req.body;
+    
+    // Check if domain is restricted
+    if (tenantService.isRestrictedDomain(domain_name)) {
+      return res.status(400).json({
+        error: `Cannot create tenant using public email domain '${domain_name}'. Please use a business or organization domain.`
+      });
+    }
+    
     // Check if domain already exists
     const existingTenant = await tenantModel.findByDomain(req.body.domain_name);
     if (existingTenant) {

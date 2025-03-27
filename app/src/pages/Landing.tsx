@@ -177,7 +177,13 @@ export default function Landing() {
       navigate("/dashboard");
     } catch (err) {
       console.error("Registration error:", err);
-      setError(err instanceof Error ? err.message : "Failed to register. Please try again.");
+      
+      // Handle the specific case of restricted email domains
+      if (err instanceof Error && err.message.includes('Cannot create tenant using public email domain')) {
+        setError("Please use a business or organization email address. Personal email domains (like Gmail, Yahoo, etc.) cannot be used to create an organization account.");
+      } else {
+        setError(err instanceof Error ? err.message : "Failed to register. Please try again.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -530,13 +536,14 @@ export default function Landing() {
             <DialogDescription>
               Join Echo to start collecting and utilizing customer feedback.
               <span className="block mt-1 text-xs text-muted-foreground">
-                Your company will be automatically identified from your email domain.
+                Your organization will be automatically identified from your email domain.
+                Please use your work email, not personal email addresses.
               </span>
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleRegisterSubmit} className="space-y-4 py-4">
             {error && (
-              <p className="text-sm font-medium text-destructive">{error}</p>
+              <p className="text-sm font-medium text-destructive bg-destructive/10 p-3 rounded-md">{error}</p>
             )}
             <FormItem>
               <FormLabel>Name</FormLabel>
@@ -553,7 +560,7 @@ export default function Landing() {
               <FormLabel>Email</FormLabel>
               <Input 
                 type="email" 
-                placeholder="your@email.com" 
+                placeholder="your@work-email.com" 
                 value={registerEmail} 
                 onChange={(e) => setRegisterEmail(e.target.value)} 
                 required 
@@ -561,7 +568,7 @@ export default function Landing() {
               />
               <FormMessage>
                 <span className="text-xs text-muted-foreground">
-                  Your organization will be determined from your email domain
+                  Please use your work email. Personal email domains (Gmail, Yahoo, etc.) cannot be used.
                 </span>
               </FormMessage>
             </FormItem>
