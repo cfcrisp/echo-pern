@@ -19,7 +19,7 @@ docker-compose up -d --build
 2. The database will be initialized with the schema defined in `database-setup.sql`
 
 ```bash
-docker exec -it <container_id> psql -U admin -d echo_db
+docker exec -it <container_id> psql -U admin -d echodb
 ```
 
 3. Start the server:
