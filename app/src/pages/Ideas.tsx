@@ -1,52 +1,146 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { 
-  ChevronRight, Lightbulb, Pencil, Plus, Trash2, 
-  ChevronDown, MoreHorizontal, ExternalLink,
-  ArrowUpDown, ArrowUp, ArrowDown, Target, Users, MessageSquare
+  ChevronRight, Lightbulb, MessageSquare, X,
+  MoreHorizontal, Trash2, Pencil, ExternalLink,
+  Plus, Filter, ArrowUpDown, ArrowUp, ArrowDown, Users
 } from 'lucide-react';
-import { AddIdeaModal, EditIdeaModal } from "@/components/shared";
 import React from 'react';
+import { AddIdeaModal, EditIdeaModal } from "@/components/shared";
+import apiClient from '@/services/apiClient';
+import { useAuth } from '@/context/AuthContext';
 
 // Define types for better type safety
-type IdeaStatus = 'new' | 'planned' | 'completed' | 'rejected';
 type IdeaPriority = 'urgent' | 'high' | 'medium' | 'low';
+type IdeaStatus = 'new' | 'planned' | 'in_progress' | 'completed' | 'rejected';
 type IdeaEffort = 'xs' | 's' | 'm' | 'l' | 'xl';
 
 type Idea = {
   id: string;
   title: string;
   description: string;
+  status: IdeaStatus;
   priority: IdeaPriority;
   effort: IdeaEffort;
-  status: IdeaStatus;
-  initiative: string;
-  customer: string;
+  customer_name?: string;
+  customer_id?: string;
+  initiative_id?: string;
   createdAt: string;
+  votes?: number;
 };
 
-// Define sort types
-type SortColumn = keyof Idea | null;
+type FilterState = {
+  priority: IdeaPriority | 'all';
+  status: IdeaStatus | 'all';
+  customer: string | 'all';
+};
+
+type SortColumn = 'title' | 'priority' | 'status' | 'customer_name' | 'votes' | 'createdAt' | null;
 type SortDirection = 'asc' | 'desc';
 
 // Ideas Component
 const Ideas = () => {
+  // State Variables
   const [activeTab, setActiveTab] = useState("all");
-  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [showMenu, setShowMenu] = useState<Record<string, boolean>>({});
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [sortColumn, setSortColumn] = useState<SortColumn>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [ideas, setIdeas] = useState<Idea[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
   
-  // Toggle expanded state for a row
-  const toggleRowExpanded = (id: string) => {
-    setExpandedRows(prev => ({
-      ...prev,
-      [id]: !prev[id]
-    }));
-  };
+  // Filter state
+  const [filters, setFilters] = useState<FilterState>({
+    priority: 'all',
+    status: 'all',
+    customer: 'all'
+  });
+  
+  const [customers, setCustomers] = useState<Array<{ id: string; name: string }>>([]);
+  const [initiatives, setInitiatives] = useState<Array<{ id: string; title: string }>>([]);
+  
+  // Fetch customers and initiatives when the component mounts
+  useEffect(() => {
+    const fetchRelatedData = async () => {
+      try {
+        // Fetch customers
+        const customersData = await apiClient.customers.getAll();
+        if (Array.isArray(customersData)) {
+          setCustomers(
+            customersData.map((customer: any) => ({
+              id: customer.id,
+              name: customer.name
+            }))
+          );
+        }
+        
+        // Fetch initiatives
+        const initiativesData = await apiClient.initiatives.getAll();
+        if (Array.isArray(initiativesData)) {
+          setInitiatives(
+            initiativesData.map((initiative: any) => ({
+              id: initiative.id,
+              title: initiative.title
+            }))
+          );
+        }
+      } catch (err) {
+        console.error('Error fetching related data:', err);
+      }
+    };
+    
+    fetchRelatedData();
+  }, []);
+  
+  // Fetch ideas data when component mounts
+  useEffect(() => {
+    const fetchIdeas = async () => {
+      try {
+        setLoading(true);
+        const data = await apiClient.ideas.getAll();
+        
+        // If data is undefined or null, treat as empty array
+        const ideasData = data || [];
+        
+        // Format the data to match our Idea type if needed
+        const formattedData = ideasData.map((idea: any) => ({
+          id: idea.id,
+          title: idea.title,
+          description: idea.description || '',
+          priority: idea.priority || 'medium',
+          status: idea.status || 'new',
+          customer_name: idea.customer_name || 'Unknown',
+          customer_id: idea.customer_id,
+          votes: idea.votes || 0,
+          createdAt: idea.created_at || 'Recently'
+        }));
+        
+        setIdeas(formattedData);
+        setError(null);
+      } catch (err: any) {
+        console.error('Error fetching ideas:', err);
+        // Set empty array instead of showing error for tenant not found
+        if (err.message && err.message.includes('Tenant not found')) {
+          console.log('No tenant found, showing empty ideas list');
+          setIdeas([]);
+          setError(null);
+        } else {
+          setError('Failed to load ideas. Please try again later.');
+          setIdeas([]);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchIdeas();
+  }, []);
   
   // Toggle menu visibility
   const toggleMenu = (id: string) => {
@@ -58,6 +152,28 @@ const Ideas = () => {
       });
       return newState;
     });
+  };
+  
+  // Toggle filter menu
+  const toggleFilterMenu = () => {
+    setShowFilterMenu(prev => !prev);
+  };
+  
+  // Clear all filters
+  const clearAllFilters = () => {
+    setFilters({
+      priority: 'all',
+      status: 'all',
+      customer: 'all'
+    });
+  };
+  
+  // Handle filter changes
+  const handleFilterChange = (filterType: keyof FilterState, value: string) => {
+    setFilters(prev => ({
+      ...prev,
+      [filterType]: value
+    }));
   };
   
   // Handle column sort
@@ -72,162 +188,158 @@ const Ideas = () => {
     }
   };
 
-  // Handler for saving new ideas
-  const handleSaveIdea = (idea: {
+  // Handler for adding new idea
+  const handleSaveIdea = async (ideaData: {
     title: string;
     description: string;
     priority: IdeaPriority;
     effort: IdeaEffort;
     status: IdeaStatus;
-    initiativeId?: string;
-    customerId?: string;
+    initiative_id?: string;
+    customer_ids?: string[];
+    source: string;
   }) => {
-    console.log('New idea:', idea);
-    // In a real app, this would make an API call to save the idea
-  };
-
-  // Handler for updating existing ideas
-  const handleUpdateIdea = (id: string, updatedIdea: {
-    title: string;
-    description: string;
-    priority: IdeaPriority;
-    effort: IdeaEffort;
-    status: IdeaStatus;
-    initiativeId?: string;
-    customerId?: string;
-  }) => {
-    console.log('Updating idea:', id, updatedIdea);
-    // In a real app, this would make an API call to update the idea
-  };
-
-  // Mock initiatives data for dropdown
-  const mockInitiatives = [
-    { id: '1', title: 'Redesign User Interface' },
-    { id: '2', title: 'Implement New Authentication System' },
-    { id: '3', title: 'Optimize Database Queries' },
-    { id: '4', title: 'Develop API Documentation' },
-    { id: '5', title: 'Implement Analytics Dashboard' },
-  ];
-
-  // Mock customers data for dropdown
-  const mockCustomers = [
-    { id: '1', name: 'Acme Corp' },
-    { id: '2', name: 'TechStart Ltd' },
-    { id: '3', name: 'Enterprise Solutions Inc' },
-    { id: '4', name: 'Startup Ventures' },
-    { id: '5', name: 'Global Industries' },
-    { id: '6', name: 'Local Business LLC' },
-    { id: '7', name: 'Innovative Tech' },
-    { id: '8', name: 'Strategic Partners Co' },
-  ];
-  
-  // Sample ideas data - in a real app, this would come from an API
-  const ideasData: Idea[] = [
-    {
-      id: "1",
-      title: "Add export to PDF feature",
-      description: "Allow users to export reports and dashboards to PDF format for easier sharing.",
-      priority: "high",
-      effort: "m",
-      status: "planned",
-      initiative: "Improve reporting capabilities",
-      customer: "Acme Corp",
-      createdAt: "3 days ago"
-    },
-    {
-      id: "2",
-      title: "Mobile app dark mode",
-      description: "Implement dark mode for the mobile application to improve user experience in low-light environments.",
-      priority: "medium",
-      effort: "s",
-      status: "new",
-      initiative: "Mobile app enhancements",
-      customer: "Various",
-      createdAt: "1 week ago"
-    },
-    {
-      id: "3",
-      title: "Bulk import of customer data",
-      description: "Add functionality to import customer data in bulk via CSV or Excel files.",
-      priority: "urgent",
-      effort: "l",
-      status: "planned",
-      initiative: "Streamline onboarding",
-      customer: "Enterprise Solutions Inc",
-      createdAt: "2 days ago"
-    },
-    {
-      id: "4",
-      title: "Automated email digests",
-      description: "Send weekly email digests summarizing key metrics and activities to stakeholders.",
-      priority: "low",
-      effort: "m",
-      status: "completed",
-      initiative: "Enhance communication",
-      customer: "Internal",
-      createdAt: "2 weeks ago"
-    },
-    {
-      id: "5",
-      title: "Integration with Slack",
-      description: "Create a Slack integration to notify teams about new feedback and ideas.",
-      priority: "medium",
-      effort: "m",
-      status: "new",
-      initiative: "Improve collaboration",
-      customer: "TechStart Ltd",
-      createdAt: "5 days ago"
-    },
-    {
-      id: "6",
-      title: "Custom dashboard widgets",
-      description: "Allow users to create and customize their own dashboard widgets.",
-      priority: "high",
-      effort: "xl",
-      status: "planned",
-      initiative: "Dashboard improvements",
-      customer: "Various",
-      createdAt: "1 week ago"
-    },
-    {
-      id: "7",
-      title: "AI-powered insights",
-      description: "Implement AI algorithms to provide insights and recommendations based on collected data.",
-      priority: "medium",
-      effort: "xl",
-      status: "new",
-      initiative: "Data intelligence",
-      customer: "Premium clients",
-      createdAt: "3 days ago"
-    },
-    {
-      id: "8",
-      title: "Improved search functionality",
-      description: "Enhance search capabilities with filters, tags, and natural language processing.",
-      priority: "high",
-      effort: "l",
-      status: "planned",
-      initiative: "UX improvements",
-      customer: "All",
-      createdAt: "4 days ago"
+    try {
+      setLoading(true);
+      
+      // Format the data for the API
+      const apiIdea = {
+        ...ideaData,
+        // For backward compatibility with the API
+        customer_id: ideaData.customer_ids && ideaData.customer_ids.length > 0 
+          ? ideaData.customer_ids[0] 
+          : undefined,
+        customer_ids: ideaData.customer_ids || []
+      };
+      
+      console.log('Creating idea with data:', apiIdea);
+      const newIdea = await apiClient.ideas.create(apiIdea);
+      
+      // Update the local state with the new idea
+      setIdeas(prevIdeas => [...prevIdeas, {
+        id: newIdea.id,
+        title: ideaData.title,
+        description: ideaData.description,
+        status: ideaData.status,
+        priority: ideaData.priority,
+        effort: ideaData.effort,
+        customer_name: newIdea.customer_name || 'Unknown',
+        customer_id: apiIdea.customer_id,
+        initiative_id: ideaData.initiative_id,
+        createdAt: 'Just now',
+        votes: newIdea.votes || 0
+      }]);
+      
+    } catch (err: any) {
+      console.error('Error creating idea:', err);
+      alert('Failed to create idea. Please try again.');
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
-  // Filter ideas based on active tab
-  let filteredIdeas = activeTab === "all" 
-    ? ideasData 
-    : ideasData.filter(item => item.status === activeTab);
+  // Handler for deleting idea
+  const handleDeleteIdea = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this idea? This action cannot be undone.')) {
+      return;
+    }
     
+    try {
+      await apiClient.ideas.delete(id);
+      
+      // Update the local state by filtering out the deleted idea
+      setIdeas(prevIdeas => prevIdeas.filter(idea => idea.id !== id));
+      
+    } catch (err) {
+      console.error('Error deleting idea:', err);
+      alert('Failed to delete the idea. Please try again.');
+    }
+  };
+
+  // Handle updating an idea
+  const handleUpdateIdea = async (id: string, updatedData: {
+    title: string;
+    description: string;
+    priority: IdeaPriority;
+    effort: IdeaEffort;
+    status: IdeaStatus;
+    customer_id?: string;
+    initiative_id?: string;
+  }) => {
+    try {
+      await apiClient.ideas.update(id, updatedData);
+      
+      // Update the local state with the updated idea
+      setIdeas(prevIdeas => prevIdeas.map(idea => 
+        idea.id === id 
+          ? { 
+              ...idea, 
+              title: updatedData.title,
+              description: updatedData.description,
+              priority: updatedData.priority,
+              status: updatedData.status,
+              customer_id: updatedData.customer_id,
+              customer_name: updatedData.customer_id 
+                ? customers.find(c => c.id === updatedData.customer_id)?.name || idea.customer_name 
+                : undefined
+            } 
+          : idea
+      ));
+      
+    } catch (err) {
+      console.error('Error updating idea:', err);
+      alert('Failed to update the idea. Please try again.');
+    }
+  };
+
+  // Get filtered ideas based on active tab and filters
+  let filteredIdeas = ideas;
+  
+  // Filter by tab first (all, planned, completed)
+  if (activeTab === 'planned') {
+    filteredIdeas = filteredIdeas.filter(idea => 
+      idea.status === 'planned' || idea.status === 'in_progress'
+    );
+  } else if (activeTab === 'completed') {
+    filteredIdeas = filteredIdeas.filter(idea => 
+      idea.status === 'completed'
+    );
+  }
+  
+  // Apply additional filters
+  if (filters.priority !== 'all') {
+    filteredIdeas = filteredIdeas.filter(idea => idea.priority === filters.priority);
+  }
+  
+  if (filters.status !== 'all') {
+    filteredIdeas = filteredIdeas.filter(idea => idea.status === filters.status);
+  }
+  
+  if (filters.customer !== 'all') {
+    filteredIdeas = filteredIdeas.filter(idea => idea.customer_id === filters.customer);
+  }
+  
   // Sort ideas based on current sort state
   if (sortColumn) {
     filteredIdeas = [...filteredIdeas].sort((a, b) => {
-      const aValue = a[sortColumn];
-      const bValue = b[sortColumn];
+      let aValue = a[sortColumn];
+      let bValue = b[sortColumn];
       
-      if (aValue < bValue) {
+      // Special handling for priority sorting (high > medium > low)
+      if (sortColumn === 'priority') {
+        const priorityValues = { high: 3, medium: 2, low: 1 };
+        aValue = priorityValues[a.priority as keyof typeof priorityValues];
+        bValue = priorityValues[b.priority as keyof typeof priorityValues];
+      }
+      
+      // Handle undefined values (treat them as empty strings or 0 for numbers)
+      const aCompare = aValue !== undefined ? aValue : (typeof aValue === 'number' ? 0 : '');
+      const bCompare = bValue !== undefined ? bValue : (typeof bValue === 'number' ? 0 : '');
+      
+      if (aCompare < bCompare) {
         return sortDirection === 'asc' ? -1 : 1;
       }
-      if (aValue > bValue) {
+      if (aCompare > bCompare) {
         return sortDirection === 'asc' ? 1 : -1;
       }
       return 0;
@@ -245,345 +357,456 @@ const Ideas = () => {
   };
   
   // Helper function to get priority badge styling
-  const getPriorityBadgeStyle = (priority: IdeaPriority): string => {
+  const getPriorityBadgeClass = (priority: IdeaPriority): string => {
     switch(priority) {
-      case 'urgent':
-        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
       case 'high':
-        return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400';
-      case 'medium':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
-      case 'low':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400';
-    }
-  };
-
-  // Helper function to get effort badge styling
-  const getEffortBadgeStyle = (effort: IdeaEffort): string => {
-    switch(effort) {
-      case 'xs':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
-      case 's':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
-      case 'm':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
-      case 'l':
-        return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400';
-      case 'xl':
         return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+      case 'medium':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
+      case 'low':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400';
     }
   };
   
   // Helper function to get status badge styling
-  const getStatusBadgeStyle = (status: IdeaStatus): string => {
+  const getStatusBadgeClass = (status: IdeaStatus): string => {
     switch(status) {
       case 'new':
         return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400';
       case 'planned':
         return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
+      case 'in_progress':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
       case 'completed':
         return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
       case 'rejected':
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400';
+        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400';
     }
   };
   
   return (
-  <div>
-    {/* Header with breadcrumb and improved styling */}
-    <div className="flex justify-between items-center mb-6">
-      <div>
-        <div className="flex items-center gap-1 text-sm text-gray-500 mb-1">
-          <Link to="/" className="hover:text-gray-700">Home</Link>
-          <ChevronRight className="h-3 w-3" />
-          <span className="text-gray-700">Ideas</span>
+    <div className="container mx-auto p-4">
+      {/* Header with breadcrumb and improved styling */}
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <div className="flex items-center gap-1 text-sm text-gray-500 mb-1">
+            <Link to="/" className="hover:text-gray-700">Home</Link>
+            <ChevronRight className="h-3 w-3" />
+            <span className="text-gray-700">Ideas</span>
+          </div>
+          <h1 className="text-2xl font-bold">Product Ideas</h1>
+          <p className="text-gray-500 mt-1">Organize and prioritize feature requests from your customers.</p>
         </div>
-        <h1 className="text-2xl font-bold">Ideas</h1>
-        <p className="text-gray-500 mt-1">Collect and manage product ideas from customers and team members.</p>
+        <div>
+          <AddIdeaModal 
+            onSave={handleSaveIdea} 
+            initiatives={initiatives}
+            customers={customers}
+          />
+        </div>
       </div>
-      <div>
-        <AddIdeaModal 
-          onSave={handleSaveIdea} 
-          initiatives={mockInitiatives} 
-          customers={mockCustomers} 
-        />
-      </div>
-    </div>
-    
-    {/* Tabs for filtering ideas */}
-    <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-      <TabsList>
-        <TabsTrigger value="all">All Ideas</TabsTrigger>
-        <TabsTrigger value="new">New</TabsTrigger>
-        <TabsTrigger value="planned">Planned</TabsTrigger>
-        <TabsTrigger value="completed">Completed</TabsTrigger>
-        <TabsTrigger value="rejected">Rejected</TabsTrigger>
-      </TabsList>
-    </Tabs>
+      
+      {/* Tabs for filtering ideas */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
+        <TabsList>
+          <TabsTrigger value="all">All Ideas</TabsTrigger>
+          <TabsTrigger value="planned">
+            <div className="flex items-center gap-1">
+              <span>Planned</span>
+              <Badge variant="secondary" className="ml-1 text-xs">
+                {ideas.filter(idea => idea.status === 'planned' || idea.status === 'in_progress').length}
+              </Badge>
+            </div>
+          </TabsTrigger>
+          <TabsTrigger value="completed">
+            <div className="flex items-center gap-1">
+              <span>Completed</span>
+              <Badge variant="secondary" className="ml-1 text-xs">
+                {ideas.filter(idea => idea.status === 'completed').length}
+              </Badge>
+            </div>
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
 
-    {/* Ideas Table */}
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[30px]"></TableHead>
-            <TableHead 
-              className="w-[250px] cursor-pointer"
-              onClick={() => handleSort('title')}
-            >
-              <div className="flex items-center">
-                Title
-                {getSortIcon('title')}
-              </div>
-            </TableHead>
-            <TableHead 
-              className="w-[100px] cursor-pointer"
-              onClick={() => handleSort('priority')}
-            >
-              <div className="flex items-center">
-                Priority
-                {getSortIcon('priority')}
-              </div>
-            </TableHead>
-            <TableHead 
-              className="w-[80px] cursor-pointer"
-              onClick={() => handleSort('effort')}
-            >
-              <div className="flex items-center">
-                Effort
-                {getSortIcon('effort')}
-              </div>
-            </TableHead>
-            <TableHead 
-              className="w-[100px] cursor-pointer"
-              onClick={() => handleSort('status')}
-            >
-              <div className="flex items-center">
-                Status
-                {getSortIcon('status')}
-              </div>
-            </TableHead>
-            <TableHead 
-              className="hidden sm:table-cell w-[120px] cursor-pointer"
-              onClick={() => handleSort('customer')}
-            >
-              <div className="flex items-center">
-                Customer
-                {getSortIcon('customer')}
-              </div>
-            </TableHead>
-            <TableHead 
-              className="w-[100px] cursor-pointer"
-              onClick={() => handleSort('createdAt')}
-            >
-              <div className="flex items-center">
-                Date
-                {getSortIcon('createdAt')}
-              </div>
-            </TableHead>
-            <TableHead className="w-[80px]">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {filteredIdeas.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={8} className="h-24 text-center">
-                No ideas found.
-              </TableCell>
-            </TableRow>
-          ) : (
-            filteredIdeas.map((idea) => (
-              <React.Fragment key={idea.id}>
-                <TableRow className={expandedRows[idea.id] ? "border-b-0" : ""}>
-                  <TableCell className="w-[30px] pr-0">
+      {/* Loading state */}
+      {loading && (
+        <div className="flex justify-center items-center p-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      )}
+
+      {/* Error state */}
+      {error && (
+        <div className="p-4 text-red-500 border border-red-300 bg-red-50 rounded-md dark:bg-red-900/20 dark:border-red-800">
+          {error}
+        </div>
+      )}
+
+      {/* Ideas Table - Only show when not loading and no errors */}
+      {!loading && !error && (
+        <>
+          {/* Filter row */}
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <div className="flex items-center space-x-2">
+              {/* Active filters */}
+              <div className="flex items-center flex-wrap gap-2">
+                {filters.priority !== 'all' && (
+                  <Badge variant="outline" className="pl-2 flex items-center gap-1 text-xs">
+                    Priority: {filters.priority}
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      className="h-7 w-7 p-0"
-                      onClick={() => toggleRowExpanded(idea.id)}
+                      onClick={() => handleFilterChange('priority', 'all')}
+                      className="h-5 w-5 p-0 ml-1 hover:bg-gray-200 dark:hover:bg-gray-700"
                     >
-                      <ChevronDown className={`h-4 w-4 transition-transform ${expandedRows[idea.id] ? "transform rotate-180" : ""}`} />
+                      <X className="h-3 w-3" />
                     </Button>
-                  </TableCell>
-                  <TableCell className="font-medium">{idea.title}</TableCell>
-                  <TableCell>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPriorityBadgeStyle(idea.priority)}`}>
-                      {idea.priority.charAt(0).toUpperCase() + idea.priority.slice(1)}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getEffortBadgeStyle(idea.effort)}`}>
-                      {idea.effort.toUpperCase()}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeStyle(idea.status)}`}>
-                      {idea.status.charAt(0).toUpperCase() + idea.status.slice(1)}
-                    </span>
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">{idea.customer}</TableCell>
-                  <TableCell>{idea.createdAt}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <EditIdeaModal
-                        idea={idea}
-                        initiatives={mockInitiatives}
-                        customers={mockCustomers}
-                        onUpdate={handleUpdateIdea}
-                        triggerButtonSize="icon"
-                      />
-                      <div className="relative">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-7 w-7 p-0"
-                          onClick={() => toggleMenu(idea.id)}
-                        >
-                          <MoreHorizontal className="h-3.5 w-3.5" />
-                        </Button>
-                        
-                        {showMenu[idea.id] && (
-                          <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded shadow-lg z-10 dark:bg-card dark:border-border">
-                            <div 
-                              className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center dark:hover:bg-gray-800/50 dark:text-gray-200"
-                              onClick={() => {
-                                console.log('Edit idea', idea.id);
-                                toggleMenu(idea.id);
-                              }}
-                            >
-                              <Pencil className="h-3.5 w-3.5 mr-2" /> Edit
-                            </div>
-                            <div 
-                              className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center dark:hover:bg-gray-800/50 dark:text-gray-200"
-                              onClick={() => {
-                                console.log('View idea details', idea.id);
-                                toggleMenu(idea.id);
-                              }}
-                            >
-                              <ExternalLink className="h-3.5 w-3.5 mr-2" /> View Details
-                            </div>
-                            <div 
-                              className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center text-red-600 dark:hover:bg-gray-800/50"
-                              onClick={() => {
-                                console.log('Delete idea', idea.id);
-                                toggleMenu(idea.id);
-                              }}
-                            >
-                              <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
-                            </div>
-                          </div>
-                        )}
+                  </Badge>
+                )}
+                
+                {filters.status !== 'all' && (
+                  <Badge variant="outline" className="pl-2 flex items-center gap-1 text-xs">
+                    Status: {filters.status.replace('_', ' ')}
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => handleFilterChange('status', 'all')}
+                      className="h-5 w-5 p-0 ml-1 hover:bg-gray-200 dark:hover:bg-gray-700"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </Badge>
+                )}
+                
+                {filters.customer !== 'all' && (
+                  <Badge variant="outline" className="pl-2 flex items-center gap-1 text-xs">
+                    Customer: {customers.find(c => c.id === filters.customer)?.name || 'Unknown'}
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => handleFilterChange('customer', 'all')}
+                      className="h-5 w-5 p-0 ml-1 hover:bg-gray-200 dark:hover:bg-gray-700"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </Badge>
+                )}
+                
+                {(filters.priority !== 'all' || filters.status !== 'all' || filters.customer !== 'all') && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-7 px-2 text-xs hover:bg-gray-100 dark:hover:bg-gray-800 hidden sm:flex"
+                    onClick={clearAllFilters}
+                  >
+                    Clear all
+                  </Button>
+                )}
+              </div>
+              
+              {/* Filter button */}
+              <div className="relative">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={toggleFilterMenu}
+                  className="h-7 gap-1 text-xs"
+                >
+                  <Filter className="h-3 w-3" />
+                  <span>Filter</span>
+                </Button>
+                
+                {showFilterMenu && (
+                  <div className="absolute left-0 mt-1 w-40 bg-white border border-gray-200 rounded shadow-lg z-10 dark:bg-card dark:border-gray-700">
+                    <div className="p-2 border-b border-gray-100 dark:border-gray-800">
+                      <h4 className="text-xs font-medium mb-1">Priority</h4>
+                      <div className="space-y-1">
+                        {['all', 'high', 'medium', 'low'].map(priority => (
+                          <label key={priority} className="flex items-center space-x-2 text-xs cursor-pointer">
+                            <input 
+                              type="radio"
+                              checked={filters.priority === priority}
+                              onChange={() => handleFilterChange('priority', priority)}
+                              className="rounded-full"
+                            />
+                            <span>{priority === 'all' ? 'All Priorities' : priority}</span>
+                          </label>
+                        ))}
                       </div>
                     </div>
-                  </TableCell>
-                </TableRow>
-                
-                {/* Expanded Row Section */}
-                {expandedRows[idea.id] && (
-                  <TableRow className="bg-slate-50 dark:bg-gray-800/50">
-                    <TableCell colSpan={8} className="p-0">
-                      <div className="p-4">
-                        <div className="space-y-4">
-                          {/* Description section with cleaner layout */}
-                          <div className="mb-4">
-                            <h4 className="text-xs font-semibold mb-2 text-slate-700 dark:text-gray-300 uppercase tracking-wider">Description</h4>
-                            <p className="text-sm text-slate-600 dark:text-gray-300">{idea.description}</p>
-                          </div>
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* Left column */}
-                            <div className="space-y-3">
-                              <div>
-                                <h4 className="text-xs font-semibold mb-2 text-slate-700 dark:text-gray-300 uppercase tracking-wider">Initiative</h4>
-                                <div className="bg-slate-50 dark:bg-gray-800/70 p-3 rounded-lg border border-slate-200 dark:border-gray-700 hover:border-slate-300 dark:hover:border-gray-600 transition-colors">
-                                  <div className="flex items-center">
-                                    <Target className="h-3.5 w-3.5 mr-2 text-primary/70 dark:text-primary/50" />
-                                    <p className="text-sm font-medium dark:text-gray-200">{idea.initiative}</p>
-                                  </div>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm" 
-                                    className="w-full justify-start mt-2 text-xs h-7 text-slate-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary"
-                                  >
-                                    <ChevronRight className="h-3 w-3 mr-1" />
-                                    View Initiative Details
-                                  </Button>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            {/* Right column - Customer info */}
-                            <div className="space-y-3">
-                              <div>
-                                <h4 className="text-xs font-semibold mb-2 text-slate-700 dark:text-gray-300 uppercase tracking-wider">Customer</h4>
-                                <div className="bg-slate-50 dark:bg-gray-800/70 p-3 rounded-lg border border-slate-200 dark:border-gray-700 hover:border-slate-300 dark:hover:border-gray-600 transition-colors">
-                                  <div className="flex items-center">
-                                    <Users className="h-3.5 w-3.5 mr-2 text-blue-500/70 dark:text-blue-400/50" />
-                                    <p className="text-sm font-medium dark:text-gray-200">{idea.customer}</p>
-                                  </div>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm" 
-                                    className="w-full justify-start mt-2 text-xs h-7 text-slate-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary"
-                                  >
-                                    <ChevronRight className="h-3 w-3 mr-1" />
-                                    View Customer Details
-                                  </Button>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          {/* Quick action buttons */}
-                          <div className="flex flex-wrap gap-2 mt-2 pt-3 border-t border-slate-100 dark:border-gray-700">
-                            <h4 className="text-xs font-semibold text-slate-700 dark:text-gray-300 mr-2 self-center">Quick Actions:</h4>
-                            <Button variant="outline" size="sm" className="h-7 text-xs">
-                              <Target className="h-3 w-3 mr-1 text-primary" />
-                              View Initiative
-                            </Button>
-                            <Button variant="outline" size="sm" className="h-7 text-xs">
-                              <Users className="h-3 w-3 mr-1 text-blue-500" />
-                              View Customer
-                            </Button>
-                            <Button variant="outline" size="sm" className="h-7 text-xs">
-                              <MessageSquare className="h-3 w-3 mr-1 text-blue-500" />
-                              Add Feedback
-                            </Button>
-                          </div>
+                    
+                    <div className="p-2 border-b border-gray-100 dark:border-gray-800">
+                      <h4 className="text-xs font-medium mb-1">Status</h4>
+                      <div className="space-y-1">
+                        {['all', 'new', 'planned', 'in_progress', 'completed', 'rejected'].map(status => (
+                          <label key={status} className="flex items-center space-x-2 text-xs cursor-pointer">
+                            <input 
+                              type="radio"
+                              checked={filters.status === status}
+                              onChange={() => handleFilterChange('status', status)}
+                              className="rounded-full"
+                            />
+                            <span>{status === 'all' ? 'All Statuses' : status.replace('_', ' ')}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    {customers.length > 0 && (
+                      <div className="p-2">
+                        <h4 className="text-xs font-medium mb-1">Customer</h4>
+                        <div className="space-y-1 max-h-32 overflow-y-auto">
+                          <label className="flex items-center space-x-2 text-xs cursor-pointer">
+                            <input 
+                              type="radio"
+                              checked={filters.customer === 'all'}
+                              onChange={() => handleFilterChange('customer', 'all')}
+                              className="rounded-full"
+                            />
+                            <span>All Customers</span>
+                          </label>
+                          {customers.map(customer => (
+                            <label key={customer.id} className="flex items-center space-x-2 text-xs cursor-pointer">
+                              <input 
+                                type="radio"
+                                checked={filters.customer === customer.id}
+                                onChange={() => handleFilterChange('customer', customer.id as string)}
+                                className="rounded-full"
+                              />
+                              <span>{customer.name}</span>
+                            </label>
+                          ))}
                         </div>
                       </div>
+                    )}
+                    
+                    <div className="flex items-center justify-between p-2 border-t border-gray-100 dark:border-gray-800">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-7 text-xs"
+                        onClick={clearAllFilters}
+                      >
+                        Clear all
+                      </Button>
+                      <Button 
+                        variant="secondary" 
+                        size="sm" 
+                        className="h-7 text-xs"
+                        onClick={toggleFilterMenu}
+                      >
+                        Apply
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div className="text-sm text-gray-500">
+              Showing <span className="font-medium text-gray-900 dark:text-gray-200">{filteredIdeas.length}</span> of <span className="font-medium text-gray-900 dark:text-gray-200">{ideas.length}</span> ideas
+            </div>
+          </div>
+          
+          {/* Ideas Table */}
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead 
+                    className="w-[300px] cursor-pointer"
+                    onClick={() => handleSort('title')}
+                  >
+                    <div className="flex items-center">
+                      Idea
+                      {getSortIcon('title')}
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="w-[100px] cursor-pointer"
+                    onClick={() => handleSort('priority')}
+                  >
+                    <div className="flex items-center">
+                      Priority
+                      {getSortIcon('priority')}
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="w-[120px] cursor-pointer"
+                    onClick={() => handleSort('status')}
+                  >
+                    <div className="flex items-center">
+                      Status
+                      {getSortIcon('status')}
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="hidden sm:table-cell w-[150px] cursor-pointer"
+                    onClick={() => handleSort('customer_name')}
+                  >
+                    <div className="flex items-center">
+                      Customer
+                      {getSortIcon('customer_name')}
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="w-[80px] text-center cursor-pointer"
+                    onClick={() => handleSort('votes')}
+                  >
+                    <div className="flex items-center justify-center">
+                      Votes
+                      {getSortIcon('votes')}
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="hidden sm:table-cell w-[120px] cursor-pointer"
+                    onClick={() => handleSort('createdAt')}
+                  >
+                    <div className="flex items-center">
+                      Created
+                      {getSortIcon('createdAt')}
+                    </div>
+                  </TableHead>
+                  <TableHead className="w-[80px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredIdeas.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-24 text-center">
+                      No ideas found matching the current filters.
                     </TableCell>
                   </TableRow>
+                ) : (
+                  filteredIdeas.map((idea) => (
+                    <TableRow key={idea.id}>
+                      <TableCell className="font-medium">
+                        <div>
+                          <div className="font-medium">{idea.title}</div>
+                          <div className="text-sm text-gray-500 line-clamp-1 dark:text-gray-400">
+                            {idea.description}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPriorityBadgeClass(idea.priority)}`}>
+                          {idea.priority}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeClass(idea.status)}`}>
+                          {idea.status.replace('_', ' ')}
+                        </span>
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">
+                        {idea.customer_name || 'Unknown'}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="outline" className="px-2 font-mono">
+                          {idea.votes}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell text-sm text-gray-500 dark:text-gray-400">
+                        {idea.createdAt}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <EditIdeaModal
+                            idea={{
+                              id: idea.id,
+                              title: idea.title,
+                              description: idea.description,
+                              priority: idea.priority,
+                              effort: idea.effort || 'm',
+                              status: idea.status === 'in_progress' ? 'planned' : idea.status,
+                              customerId: idea.customer_id,
+                              customer: idea.customer_name
+                            }}
+                            initiatives={initiatives}
+                            customers={customers}
+                            onUpdate={(id, updatedData) => {
+                              // Map EditIdeaModal fields to our API format
+                              handleUpdateIdea(id, {
+                                title: updatedData.title,
+                                description: updatedData.description, 
+                                priority: updatedData.priority,
+                                effort: updatedData.effort,
+                                status: updatedData.status,
+                                customer_id: updatedData.customerId,
+                                initiative_id: updatedData.initiativeId
+                              });
+                            }}
+                            triggerButtonSize="icon"
+                          />
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-7 w-7 p-0"
+                            onClick={() => console.log('View idea details', idea.id)}
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </Button>
+                          
+                          <div className="relative">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-7 w-7 p-0"
+                              onClick={() => toggleMenu(idea.id)}
+                            >
+                              <MoreHorizontal className="h-3.5 w-3.5" />
+                            </Button>
+                            
+                            {showMenu[idea.id] && (
+                              <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded shadow-lg z-10 dark:bg-card dark:border-border">
+                                <div 
+                                  className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center dark:hover:bg-gray-800/50 dark:text-gray-200"
+                                  onClick={() => {
+                                    console.log('View idea details', idea.id);
+                                    toggleMenu(idea.id);
+                                  }}
+                                >
+                                  <ExternalLink className="h-3.5 w-3.5 mr-2" /> View Details
+                                </div>
+                                <div 
+                                  className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center text-red-600 dark:hover:bg-gray-800/50"
+                                  onClick={() => {
+                                    handleDeleteIdea(idea.id);
+                                    toggleMenu(idea.id);
+                                  }}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
                 )}
-              </React.Fragment>
-            ))
-          )}
-        </TableBody>
-      </Table>
-    </div>
-    
-    {/* Empty state - will be shown conditionally in a real implementation */}
-    {filteredIdeas.length === 0 && (
-      <div className="flex flex-col items-center justify-center py-12 px-4 border-2 border-dashed border-gray-300 rounded-lg mt-6 dark:border-gray-700">
-        <div className="bg-gray-100 p-3 rounded-full mb-4 dark:bg-gray-800">
-          <Lightbulb className="h-6 w-6 text-gray-500 dark:text-gray-400" />
+              </TableBody>
+            </Table>
+          </div>
+        </>
+      )}
+
+      {/* Empty state - will be shown conditionally when there's no ideas */}
+      {!loading && !error && ideas.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-12 px-4 border-2 border-dashed border-gray-300 rounded-lg mt-6 dark:border-gray-700">
+          <div className="bg-gray-100 p-3 rounded-full mb-4 dark:bg-gray-800">
+            <Lightbulb className="h-6 w-6 text-gray-500 dark:text-gray-400" />
+          </div>
+          <h3 className="text-lg font-medium mb-1 dark:text-gray-200">No ideas yet</h3>
+          <p className="text-gray-500 text-center mb-4 dark:text-gray-400">Start capturing feature requests and ideas from your customers using the Add Idea button above.</p>
         </div>
-        <h3 className="text-lg font-medium mb-1 dark:text-gray-200">No ideas yet</h3>
-        <p className="text-gray-500 text-center mb-4 dark:text-gray-400">Start collecting ideas from your team and customers to improve your product.</p>
-        <AddIdeaModal 
-          onSave={handleSaveIdea} 
-          initiatives={mockInitiatives} 
-          customers={mockCustomers} 
-        />
-      </div>
-    )}
-  </div>
+      )}
+    </div>
   );
 };
 

@@ -1,66 +1,26 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   ChevronRight, Target, Pencil, Plus, Trash2, 
-  Calendar, List, ChevronDown, MoreHorizontal, BarChart, Edit 
+  Calendar, List, MoreHorizontal, BarChart 
 } from 'lucide-react';
 import { AddGoalModal, EditGoalModal } from "@/components/shared";
+import apiClient from '@/services/apiClient';
+import { useAuth } from '@/context/AuthContext';
 
 type Goal = {
   id: string;
   title: string;
   description: string;
   status: 'active' | 'planned' | 'completed';
-  targetDate?: string;
+  target_date?: string;
   // Additional fields to simulate relationships
-  initiativesCount?: number;
+  initiatives_count?: number;
+  created_at?: string;
 };
-
-const mockGoals: Goal[] = [
-  {
-    id: '1',
-    title: 'Increase Customer Retention',
-    description: 'Improve customer retention by 15% through enhanced product features and customer service.',
-    status: 'active',
-    targetDate: '2023-12-31',
-    initiativesCount: 3,
-  },
-  {
-    id: '2',
-    title: 'Launch Mobile Application',
-    description: 'Develop and launch a mobile application to expand our market reach.',
-    status: 'planned',
-    targetDate: '2024-03-15',
-    initiativesCount: 2,
-  },
-  {
-    id: '3',
-    title: 'Optimize Onboarding Process',
-    description: 'Streamline the customer onboarding process to reduce time-to-value.',
-    status: 'completed',
-    targetDate: '2023-09-30',
-    initiativesCount: 4,
-  },
-  {
-    id: '4',
-    title: 'Expand to European Market',
-    description: 'Research and implement strategy for European market expansion.',
-    status: 'active',
-    targetDate: '2024-06-30',
-    initiativesCount: 1,
-  },
-  {
-    id: '5',
-    title: 'Implement AI-driven Analytics',
-    description: 'Integrate AI capabilities into our analytics platform for predictive insights.',
-    status: 'planned',
-    targetDate: '2024-05-15',
-    initiativesCount: 2,
-  },
-];
 
 const getStatusColor = (status: Goal['status']) => {
   switch (status) {
@@ -120,27 +80,64 @@ const getTimeRemaining = (dateString: string) => {
   }
 };
 
-const GoalCard: React.FC<{ goal: Goal }> = ({ goal }) => {
-  const statusColor = getStatusColor(goal.status);
-  const [expanded, setExpanded] = useState(false);
-  const [showMenu, setShowMenu] = useState(false);
+// Calculate progress percentage based on creation date and target date
+const calculateProgress = (createdAt?: string, targetDate?: string): number => {
+  if (!createdAt || !targetDate) return 0;
   
-  // Ensure initiativesCount is defined
-  const initiativesCount = goal.initiativesCount ?? 0;
+  const createDate = new Date(createdAt);
+  const target = new Date(targetDate);
+  const today = new Date();
   
-  // Format the target date and get time remaining
-  const formattedDate = goal.targetDate ? formatDate(goal.targetDate) : '';
-  const timeRemaining = goal.targetDate ? getTimeRemaining(goal.targetDate) : null;
+  // If target date is in the past, return 100%
+  if (today > target) return 100;
   
-  // Handle goal updates
-  const handleUpdateGoal = (id: string, updatedGoal: {
+  // Calculate total duration and elapsed duration
+  const totalDuration = target.getTime() - createDate.getTime();
+  const elapsedDuration = today.getTime() - createDate.getTime();
+  
+  // Calculate percentage (capped at 100%)
+  const percentage = Math.min((elapsedDuration / totalDuration) * 100, 100);
+  
+  // Return rounded percentage
+  return Math.round(percentage);
+};
+
+const GoalCard: React.FC<{ 
+  goal: Goal; 
+  onUpdate: (id: string, updatedGoal: {
     title: string;
     description: string;
     status: Goal['status'];
     target_date?: string;
-  }) => {
-    console.log('Updating goal:', id, updatedGoal);
-    // In a real app, this would make an API call to update the goal
+  }) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  linkedInitiatives?: Array<{ id: string; title: string; status: string }>;
+}> = ({ goal, onUpdate, onDelete, linkedInitiatives = [] }) => {
+  const statusColor = getStatusColor(goal.status);
+  const [showMenu, setShowMenu] = useState(false);
+  const [showInitiatives, setShowInitiatives] = useState(false);
+  const navigate = useNavigate();
+  
+  // Ensure initiatives_count is defined
+  const initiatives_count = goal.initiatives_count ?? linkedInitiatives.length ?? 0;
+  
+  // Format the target date and get time remaining
+  const formattedDate = goal.target_date ? formatDate(goal.target_date) : '';
+  const timeRemaining = goal.target_date ? getTimeRemaining(goal.target_date) : null;
+  
+  // Calculate progress percentage
+  const progressPercent = calculateProgress(goal.created_at, goal.target_date);
+  
+  // Handle navigation to initiative detail page
+  const goToInitiative = (initiativeId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigate(`/initiatives/${initiativeId}`);
+  };
+  
+  // Toggle initiatives visibility
+  const toggleInitiatives = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowInitiatives(!showInitiatives);
   };
   
   return (
@@ -162,8 +159,9 @@ const GoalCard: React.FC<{ goal: Goal }> = ({ goal }) => {
           <div className="flex items-center space-x-2">
             <EditGoalModal 
               goal={goal}
-              onUpdate={handleUpdateGoal}
+              onUpdate={(updatedGoal) => onUpdate(goal.id, updatedGoal)}
               triggerButtonSize="icon"
+              initiatives={linkedInitiatives}
             />
             <div className="relative">
               <Button 
@@ -178,18 +176,9 @@ const GoalCard: React.FC<{ goal: Goal }> = ({ goal }) => {
               {showMenu && (
                 <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded shadow-lg z-10 dark:bg-card dark:border-border">
                   <div 
-                    className="px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer flex items-center dark:hover:bg-gray-800/50 dark:text-gray-200"
-                    onClick={() => {
-                      console.log('Edit goal', goal.id);
-                      setShowMenu(false);
-                    }}
-                  >
-                    <Pencil className="h-4 w-4 mr-2" /> Edit
-                  </div>
-                  <div 
                     className="px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer flex items-center text-red-600 dark:hover:bg-gray-800/50"
                     onClick={() => {
-                      console.log('Delete goal', goal.id);
+                      onDelete(goal.id);
                       setShowMenu(false);
                     }}
                   >
@@ -201,9 +190,23 @@ const GoalCard: React.FC<{ goal: Goal }> = ({ goal }) => {
           </div>
         </div>
         
+        {/* Progress Bar */}
+        <div className="mt-3 mb-3">
+          <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
+            <span>Progress</span>
+            <span>{progressPercent}%</span>
+          </div>
+          <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-1.5">
+            <div 
+              className="bg-purple-500 dark:bg-purple-400 h-1.5 rounded-full transition-all" 
+              style={{ width: `${progressPercent}%` }}
+            ></div>
+          </div>
+        </div>
+        
         <div className="flex items-center space-x-4 mt-2">
           {/* Target Date with Prominence */}
-          {goal.targetDate && (
+          {goal.target_date && (
             <div className="bg-purple-50 dark:bg-purple-900/20 rounded-md px-2 py-1 flex items-center text-xs">
               <Calendar className="h-3 w-3 mr-1 text-purple-600 dark:text-purple-400" />
               <span className="font-medium text-purple-800 dark:text-purple-300">{formattedDate}</span>
@@ -213,124 +216,70 @@ const GoalCard: React.FC<{ goal: Goal }> = ({ goal }) => {
             </div>
           )}
           
-          {/* Linked Initiatives */}
-          {initiativesCount > 0 && (
-            <div className="flex items-center text-xs text-slate-500 dark:text-gray-400">
+          {/* Linked Initiatives Button */}
+          {initiatives_count > 0 && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-6 px-2 text-xs text-slate-600 dark:text-gray-400 hover:bg-slate-100 dark:hover:bg-gray-800"
+              onClick={toggleInitiatives}
+            >
               <List className="h-3 w-3 mr-1" />
-              <span>{initiativesCount} initiatives</span>
-            </div>
+              <span>{initiatives_count} initiatives</span>
+              <ChevronRight className={`h-3 w-3 ml-1 transition-transform ${showInitiatives ? 'rotate-90' : ''}`} />
+            </Button>
           )}
-          
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="ml-auto text-xs text-slate-500 dark:text-gray-400 p-0 h-6"
-            onClick={() => setExpanded(!expanded)}
-          >
-            {expanded ? 'Hide details' : 'Show details'}
-            <ChevronDown className={`ml-1 h-3 w-3 transition-transform ${expanded ? 'transform rotate-180' : ''}`} />
-          </Button>
         </div>
         
-        {expanded && (
-          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-gray-700">
-            <div className="mb-4">
-              <h4 className="text-xs font-semibold mb-2 text-slate-700 dark:text-gray-300 uppercase tracking-wider">Goal Description</h4>
-              <p className="text-sm text-slate-600 dark:text-gray-300">{goal.description}</p>
+        {/* Initiative Indicators - Only shown when expanded */}
+        {showInitiatives && linkedInitiatives && linkedInitiatives.length > 0 && (
+          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-gray-700">
+            <div className="mb-1 text-xs font-medium text-slate-500 dark:text-gray-400 flex items-center">
+              <Target className="h-3.5 w-3.5 mr-1.5 text-primary" />
+              <span>Linked Initiatives</span>
             </div>
-            
-            {/* Mock Initiatives related to this goal */}
-            {initiativesCount > 0 && (
-              <div className="mb-4">
-                <h4 className="text-xs font-semibold mb-2 text-slate-700 dark:text-gray-300 uppercase tracking-wider flex items-center">
-                  <Target className="h-3.5 w-3.5 mr-1.5 text-primary/70" />
-                  Related Initiatives ({initiativesCount})
-                </h4>
-                <div className="bg-slate-50 dark:bg-gray-800/70 p-3 rounded-lg border border-slate-200 dark:border-gray-700">
-                  <div className="space-y-2">
-                    {Array.from({ length: Math.min(initiativesCount, 3) }).map((_, idx) => (
-                      <div key={idx} className="bg-white dark:bg-gray-900/50 p-2.5 rounded-md border border-slate-200 dark:border-gray-700 hover:border-slate-300 dark:hover:border-gray-600 transition-colors">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <span className="text-xs font-medium dark:text-gray-200">
-                              {idx === 0 ? 'Redesign User Interface' : 
-                               idx === 1 ? 'Improve Customer Journey' : 'Optimize Performance'}
-                            </span>
-                            <p className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">
-                              {idx === 0 ? 'Active' : idx === 1 ? 'Planned' : 'Completed'}
-                            </p>
-                          </div>
-                          <Button variant="ghost" size="sm" className="h-6 text-xs hover:text-primary dark:hover:text-primary">
-                            <ChevronRight className="h-3 w-3 mr-1" />
-                            View
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  {initiativesCount > 3 && (
+            <div className="space-y-2 mt-2">
+              {linkedInitiatives.map(initiative => {
+                // Determine status colors for initiatives
+                let statusColor;
+                switch(initiative.status) {
+                  case 'active':
+                    statusColor = 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
+                    break;
+                  case 'planned':
+                    statusColor = 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
+                    break;
+                  case 'completed':
+                    statusColor = 'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400';
+                    break;
+                  default:
+                    statusColor = 'bg-slate-100 text-slate-700 dark:bg-slate-800/50 dark:text-slate-400';
+                }
+                
+                return (
+                  <div 
+                    key={initiative.id} 
+                    className="bg-white dark:bg-gray-800/40 rounded-md border border-slate-200 dark:border-gray-700 p-2 flex items-center justify-between hover:border-primary/20 hover:bg-primary/5 transition-colors cursor-pointer"
+                    onClick={(e) => goToInitiative(initiative.id, e)}
+                  >
+                    <div className="flex items-center">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary mr-2"></div>
+                      <span className="text-sm font-medium dark:text-gray-200">{initiative.title}</span>
+                      <span className={`ml-2 px-1.5 py-0.5 text-xs rounded-full ${statusColor}`}>
+                        {initiative.status}
+                      </span>
+                    </div>
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      className="w-full justify-center mt-2 text-xs h-7 text-slate-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary"
+                      className="h-6 w-6 p-0 rounded-full"
+                      onClick={(e) => goToInitiative(initiative.id, e)}
                     >
-                      <ChevronRight className="h-3 w-3 mr-1" />
-                      View All {initiativesCount} Initiatives
+                      <ChevronRight className="h-3.5 w-3.5" />
                     </Button>
-                  )}
-                  
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="w-full justify-center mt-2 text-xs h-7 text-slate-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary border border-dashed border-slate-200 dark:border-gray-700"
-                  >
-                    <Plus className="h-3 w-3 mr-1" />
-                    Add New Initiative
-                  </Button>
-                </div>
-              </div>
-            )}
-            
-            {/* Additional details section */}
-            <div className="mb-4">
-              <h4 className="text-xs font-semibold mb-2 text-slate-700 dark:text-gray-300 uppercase tracking-wider flex items-center">
-                <BarChart className="h-3.5 w-3.5 mr-1.5 text-purple-500" />
-                Progress
-              </h4>
-              <div className="bg-slate-50 dark:bg-gray-800/70 p-3 rounded-lg border border-slate-200 dark:border-gray-700">
-                <div className="space-y-2">
-                  <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400">
-                    <span>Overall Completion</span>
-                    <span>{Math.floor(Math.random() * 100)}%</span>
                   </div>
-                  <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-1.5">
-                    <div 
-                      className="bg-purple-500 dark:bg-purple-400 h-1.5 rounded-full transition-all" 
-                      style={{ width: `${Math.floor(Math.random() * 100)}%` }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            {/* Quick action buttons */}
-            <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-slate-100 dark:border-gray-700">
-              <h4 className="text-xs font-semibold text-slate-700 dark:text-gray-300 mr-2 self-center">Quick Actions:</h4>
-              {initiativesCount > 0 && (
-                <Button variant="outline" size="sm" className="h-7 text-xs">
-                  <Target className="h-3 w-3 mr-1 text-primary" />
-                  View Initiatives
-                </Button>
-              )}
-              <Button variant="outline" size="sm" className="h-7 text-xs">
-                <Plus className="h-3 w-3 mr-1 text-purple-500" />
-                Add Initiative
-              </Button>
-              <Button variant="outline" size="sm" className="h-7 text-xs">
-                <Edit className="h-3 w-3 mr-1 text-gray-500" />
-                Edit Goal
-              </Button>
+                );
+              })}
             </div>
           </div>
         )}
@@ -339,113 +288,379 @@ const GoalCard: React.FC<{ goal: Goal }> = ({ goal }) => {
   );
 };
 
-const Goals: React.FC = () => {
-  const [filter, setFilter] = useState<'all' | 'active' | 'planned' | 'completed'>('all');
-  
-  const filteredGoals = filter === 'all' 
-    ? mockGoals 
-    : mockGoals.filter(goal => goal.status === filter);
+// Debug logging
+console.log('apiClient:', apiClient);
+console.log('goals API:', apiClient.goals);
 
-  const handleSaveGoal = (goal: {
+const Goals: React.FC = () => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState('all');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
+  const [initiatives, setInitiatives] = useState<Array<{
+    id: string;
+    title: string;
+    status: string;
+    goal_id?: string;
+  }>>([]);
+
+  // Fetch goals data from API when component mounts
+  useEffect(() => {
+    console.log('Goals component mounted, fetching data');
+    
+    const fetchGoals = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        console.log('Calling apiClient.goals.getAll()');
+        const goalsData = await apiClient.goals.getAll();
+        console.log('Goals data received:', goalsData);
+        
+        // Also fetch initiatives to link with goals
+        const initiativesData = await apiClient.initiatives.getAll();
+        console.log('Initiatives data received:', initiativesData);
+        
+        // Handle error responses
+        if (goalsData && goalsData.error) {
+          console.error('Error in goals response:', goalsData.error);
+          setError(goalsData.error);
+          setGoals([]);
+        } else {
+          setGoals(goalsData || []);
+        }
+        
+        if (initiativesData && !('error' in initiativesData)) {
+          setInitiatives(initiativesData || []);
+        }
+      } catch (err) {
+        console.error('Error fetching goals:', err);
+        setError('Failed to load goals. Please try again later.');
+        setGoals([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchGoals();
+  }, []);
+
+  const handleSaveGoal = async (goalData: {
     title: string;
     description: string;
     status: 'active' | 'planned' | 'completed';
-    targetDate?: string;
+    target_date?: string;
   }) => {
-    console.log('New goal:', goal);
-    // In a real app, this would make an API call to save the goal
+    try {
+      setLoading(true);
+      // Create the new goal via API
+      const newGoal = await apiClient.goals.create(goalData);
+      
+      // Update the local state with the new goal
+      setGoals(prevGoals => [...prevGoals, newGoal]);
+      
+      // Close the modal
+      setShowAddModal(false);
+    } catch (err) {
+      console.error('Error creating goal:', err);
+      // Show error message to user
+      alert('Failed to create goal. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateGoal = async (id: string, goalData: {
+    title: string;
+    description: string;
+    status: 'active' | 'planned' | 'completed';
+    target_date?: string;
+    linked_initiatives?: string[];
+  }) => {
+    try {
+      setLoading(true);
+      // Extract linked initiatives before sending data to API
+      const { linked_initiatives, ...apiGoalData } = goalData;
+      
+      // Update the goal via API
+      await apiClient.goals.update(id, apiGoalData);
+      
+      // Handle updating initiative relationships if provided
+      if (linked_initiatives) {
+        // Find currently linked initiatives
+        const currentlyLinked = initiatives.filter(initiative => initiative.goal_id === id)
+                                           .map(initiative => initiative.id);
+        
+        // Find initiatives to link (not already linked)
+        const toLink = linked_initiatives.filter(initiativeId => 
+                                            !currentlyLinked.includes(initiativeId));
+        
+        // Find initiatives to unlink (no longer in the list)
+        const toUnlink = currentlyLinked.filter(initiativeId => 
+                                              !linked_initiatives.includes(initiativeId));
+        
+        // Update all initiatives that need changes
+        const updatePromises = [
+          ...toLink.map(initiativeId => 
+            apiClient.initiatives.update(initiativeId, { goal_id: id })),
+          ...toUnlink.map(initiativeId => 
+            apiClient.initiatives.update(initiativeId, { goal_id: undefined }))
+        ];
+        
+        if (updatePromises.length > 0) {
+          await Promise.all(updatePromises);
+          
+          // Update local initiatives state
+          setInitiatives(prevInitiatives => 
+            prevInitiatives.map(initiative => {
+              if (toLink.includes(initiative.id)) {
+                return { ...initiative, goal_id: id };
+              } else if (toUnlink.includes(initiative.id)) {
+                return { ...initiative, goal_id: undefined };
+              }
+              return initiative;
+            })
+          );
+        }
+      }
+      
+      // Update the local state
+      setGoals(prevGoals => 
+        prevGoals.map(goal => 
+          goal.id === id ? { ...goal, ...goalData } : goal
+        )
+      );
+    } catch (err) {
+      console.error('Error updating goal:', err);
+      alert('Failed to update goal. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteGoal = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this goal?')) {
+      try {
+        setLoading(true);
+        // Delete the goal via API
+        await apiClient.goals.delete(id);
+        
+        // Update the local state
+        setGoals(prevGoals => prevGoals.filter(goal => goal.id !== id));
+      } catch (err) {
+        console.error('Error deleting goal:', err);
+        alert('Failed to delete goal. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  // Filter goals based on the search term
+  const filteredGoals = goals.filter(goal => 
+    goal.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    goal.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Filter goals based on the active tab
+  const displayedGoals = activeTab === 'all' 
+    ? filteredGoals 
+    : filteredGoals.filter(goal => goal.status === activeTab);
+
+  // Get initiatives linked to a specific goal
+  const getLinkedInitiatives = (goalId: string) => {
+    return initiatives.filter(initiative => initiative.goal_id === goalId);
   };
 
   return (
-    <div>
-      {/* Header with breadcrumb and improved styling */}
-      <div className="flex justify-between items-center mb-6">
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
         <div>
-          <div className="flex items-center gap-1 text-sm text-gray-500 mb-1">
-            <Link to="/" className="hover:text-gray-700">Home</Link>
-            <ChevronRight className="h-3 w-3" />
-            <span className="text-gray-700">Goals</span>
-          </div>
-          <h1 className="text-2xl font-bold">Strategic Goals</h1>
-          <p className="text-gray-500 mt-1">Define and track your organization's strategic goals.</p>
+          <h1 className="text-3xl font-bold tracking-tight">Goals</h1>
+          <p className="text-muted-foreground">
+            Set, track, and achieve strategic initiatives
+          </p>
         </div>
-        <div>
-          <AddGoalModal onSave={handleSaveGoal} />
+        <Button onClick={() => setShowAddModal(true)}>
+          <Plus className="h-4 w-4 mr-2" /> Add Goal
+        </Button>
+      </div>
+
+      {/* Add Goal Modal */}
+      <AddGoalModal 
+        isOpen={showAddModal} 
+        onClose={() => setShowAddModal(false)} 
+        onSave={handleSaveGoal}
+        initiatives={initiatives}
+      />
+
+      {/* Search and Filtering */}
+      <div className="flex justify-between items-center space-x-2">
+        <div className="relative flex-1 max-w-sm">
+          <input
+            type="text"
+            className="w-full px-4 py-2 pl-10 rounded-lg border focus:outline-none focus:ring-2 focus:ring-primary/50 dark:bg-gray-800 dark:border-gray-700"
+            placeholder="Search goals..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <svg
+            className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            ></path>
+          </svg>
         </div>
       </div>
-      
-      <Tabs value={filter} onValueChange={(value) => setFilter(value as any)} className="mb-6">
-        <TabsList>
+
+      {/* Status Tabs */}
+      <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="bg-slate-100 dark:bg-slate-800/50">
           <TabsTrigger value="all">All Goals</TabsTrigger>
           <TabsTrigger value="active">Active</TabsTrigger>
           <TabsTrigger value="planned">Planned</TabsTrigger>
           <TabsTrigger value="completed">Completed</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="all" className="mt-6 space-y-3">
-          {filteredGoals.map(goal => (
-            <GoalCard key={goal.id} goal={goal} />
-          ))}
-          
-          {filteredGoals.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 px-4 border-2 border-dashed border-gray-300 rounded-lg mt-6">
-              <div className="bg-gray-100 p-3 rounded-full mb-4">
-                <Target className="h-6 w-6 text-gray-500" />
+        <TabsContent value="all" className="mt-4">
+          {loading ? (
+            <div className="flex justify-center items-center p-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : error ? (
+            <div className="p-4 text-red-500 border border-red-300 bg-red-50 rounded-md dark:bg-red-900/20 dark:border-red-800">
+              {error}
+            </div>
+          ) : displayedGoals.length === 0 ? (
+            <div className="text-center py-10">
+              <div className="mb-3">
+                <Target className="h-12 w-12 mx-auto text-gray-400" />
               </div>
-              <h3 className="text-lg font-medium mb-1">No goals yet</h3>
-              <p className="text-gray-500 text-center mb-4">Start defining strategic goals for your organization.</p>
-              <AddGoalModal onSave={handleSaveGoal} />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">No goals found</h3>
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                {searchTerm 
+                  ? "No goals match your search criteria." 
+                  : "Get started by creating your first goal using the Add Goal button above."}
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4">
+              {displayedGoals.map((goal) => (
+                <GoalCard 
+                  key={goal.id} 
+                  goal={goal} 
+                  onUpdate={handleUpdateGoal}
+                  onDelete={handleDeleteGoal}
+                  linkedInitiatives={getLinkedInitiatives(goal.id)}
+                />
+              ))}
             </div>
           )}
         </TabsContent>
         
-        <TabsContent value="active" className="mt-6 space-y-3">
-          {filteredGoals.map(goal => (
-            <GoalCard key={goal.id} goal={goal} />
-          ))}
-          
-          {filteredGoals.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 px-4 border-2 border-dashed border-gray-300 rounded-lg mt-6">
-              <div className="bg-gray-100 p-3 rounded-full mb-4">
-                <Target className="h-6 w-6 text-gray-500" />
+        <TabsContent value="active" className="mt-4">
+          {loading ? (
+            <div className="flex justify-center items-center p-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : displayedGoals.length === 0 ? (
+            <div className="text-center py-10">
+              <div className="mb-3">
+                <Target className="h-12 w-12 mx-auto text-gray-400" />
               </div>
-              <h3 className="text-lg font-medium mb-1">No active goals</h3>
-              <p className="text-gray-500 text-center mb-4">Start defining active goals for your organization.</p>
-              <AddGoalModal onSave={handleSaveGoal} />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">No active goals</h3>
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                {searchTerm 
+                  ? "No active goals match your search criteria." 
+                  : "Get started by creating an active goal using the Add Goal button above."}
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4">
+              {displayedGoals.map((goal) => (
+                <GoalCard 
+                  key={goal.id} 
+                  goal={goal} 
+                  onUpdate={handleUpdateGoal}
+                  onDelete={handleDeleteGoal}
+                  linkedInitiatives={getLinkedInitiatives(goal.id)}
+                />
+              ))}
             </div>
           )}
         </TabsContent>
         
-        <TabsContent value="planned" className="mt-6 space-y-3">
-          {filteredGoals.map(goal => (
-            <GoalCard key={goal.id} goal={goal} />
-          ))}
-          
-          {filteredGoals.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 px-4 border-2 border-dashed border-gray-300 rounded-lg mt-6">
-              <div className="bg-gray-100 p-3 rounded-full mb-4">
-                <Target className="h-6 w-6 text-gray-500" />
+        <TabsContent value="planned" className="mt-4">
+          {loading ? (
+            <div className="flex justify-center items-center p-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : displayedGoals.length === 0 ? (
+            <div className="text-center py-10">
+              <div className="mb-3">
+                <Target className="h-12 w-12 mx-auto text-gray-400" />
               </div>
-              <h3 className="text-lg font-medium mb-1">No planned goals</h3>
-              <p className="text-gray-500 text-center mb-4">Start defining planned goals for your organization.</p>
-              <AddGoalModal onSave={handleSaveGoal} />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">No planned goals</h3>
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                {searchTerm 
+                  ? "No planned goals match your search criteria." 
+                  : "Get started by creating a planned goal using the Add Goal button above."}
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4">
+              {displayedGoals.map((goal) => (
+                <GoalCard 
+                  key={goal.id} 
+                  goal={goal} 
+                  onUpdate={handleUpdateGoal}
+                  onDelete={handleDeleteGoal}
+                  linkedInitiatives={getLinkedInitiatives(goal.id)}
+                />
+              ))}
             </div>
           )}
         </TabsContent>
         
-        <TabsContent value="completed" className="mt-6 space-y-3">
-          {filteredGoals.map(goal => (
-            <GoalCard key={goal.id} goal={goal} />
-          ))}
-          
-          {filteredGoals.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 px-4 border-2 border-dashed border-gray-300 rounded-lg mt-6">
-              <div className="bg-gray-100 p-3 rounded-full mb-4">
-                <Target className="h-6 w-6 text-gray-500" />
+        <TabsContent value="completed" className="mt-4">
+          {loading ? (
+            <div className="flex justify-center items-center p-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : displayedGoals.length === 0 ? (
+            <div className="text-center py-10">
+              <div className="mb-3">
+                <Target className="h-12 w-12 mx-auto text-gray-400" />
               </div>
-              <h3 className="text-lg font-medium mb-1">No completed goals</h3>
-              <p className="text-gray-500 text-center mb-4">Completed goals will appear here.</p>
-              <AddGoalModal onSave={handleSaveGoal} />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">No completed goals</h3>
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                {searchTerm 
+                  ? "No completed goals match your search criteria." 
+                  : "You haven't completed any goals yet."}
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4">
+              {displayedGoals.map((goal) => (
+                <GoalCard 
+                  key={goal.id} 
+                  goal={goal} 
+                  onUpdate={handleUpdateGoal}
+                  onDelete={handleDeleteGoal}
+                  linkedInitiatives={getLinkedInitiatives(goal.id)}
+                />
+              ))}
             </div>
           )}
         </TabsContent>

@@ -43,11 +43,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // If successful, set the user and token
         setToken(storedToken);
         setUser(userData);
+        
+        // Ensure tenant info is stored
+        if (userData.tenant_id) {
+          localStorage.setItem('userTenant', JSON.stringify({ 
+            id: userData.tenant_id 
+          }));
+        }
       } catch (error) {
         console.error('Error validating authentication:', error);
         // If token is invalid, clear local storage
         localStorage.removeItem('authToken');
         localStorage.removeItem('userData');
+        localStorage.removeItem('userTenant');
       } finally {
         setLoading(false);
       }
@@ -64,6 +72,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Save to localStorage
     localStorage.setItem('authToken', newToken);
     localStorage.setItem('userData', JSON.stringify(newUser));
+    
+    // Save tenant information specifically
+    if (newUser.tenant_id) {
+      localStorage.setItem('userTenant', JSON.stringify({ 
+        id: newUser.tenant_id 
+      }));
+    }
   };
 
   const logout = () => {
@@ -74,6 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Clear from localStorage
     localStorage.removeItem('authToken');
     localStorage.removeItem('userData');
+    localStorage.removeItem('userTenant');
   };
 
   return (

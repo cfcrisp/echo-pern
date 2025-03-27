@@ -10,59 +10,85 @@ const pool = require('../config/database');
 const userModel = new UserModel(pool);
 
 /**
- * Verifies the JWT token in the request header
+ * Middleware to authenticate requests
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  * @param {Function} next - Express next function
  */
 const authenticate = async (req, res, next) => {
   try {
-    // Get the authorization header
+    // Only log auth in development mode
+    const isDevMode = process.env.NODE_ENV === 'development';
+    if (isDevMode) {
+      console.log(`AUTH: ${req.method} ${req.path}`);
+    }
+    
+    // Get the token from the Authorization header or cookie
     const authHeader = req.headers.authorization;
+    const token = authHeader ? authHeader.split(' ')[1] : null;
     
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ 
-        error: 'Authentication required' 
-      });
+    if (!token) {
+      // If no token in header, check cookie
+      const cookieToken = req.cookies.token;
+      if (!cookieToken) {
+        if (isDevMode) {
+          console.log('AUTH: No token found');
+        }
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
     }
     
-    // Extract token from header
-    const token = authHeader.split(' ')[1];
-    
-    // Verify token
-    const decoded = jwt.verify(token, JWT_SECRET);
-    
-    // Check if user exists
-    const user = await userModel.findById(decoded.userId);
-    
-    if (!user) {
-      return res.status(401).json({ 
-        error: 'User not found' 
-      });
+    try {
+      // Verify the token
+      const decoded = jwt.verify(token, JWT_SECRET);
+      
+      // Get the user from the database
+      const user = await userModel.findById(decoded.userId);
+      
+      if (!user) {
+        if (isDevMode) {
+          console.log('AUTH: Invalid user ID from token:', decoded.userId);
+        }
+        return res.status(401).json({ error: 'Invalid token' });
+      }
+      
+      // Attach user to request object
+      req.user = user;
+      
+      // Ensure tenant ID is set
+      if (user.tenant_id) {
+        req.tenantId = user.tenant_id;
+        if (isDevMode) {
+          console.log(`AUTH: User ${user.id.substring(0, 8)}, Tenant: ${user.tenant_id.substring(0, 8)}`);
+        }
+      }
+      
+      // Allow the request to proceed
+      next();
+    } catch (error) {
+      if (isDevMode) {
+        console.error('AUTH: Token verification failed:', error.message);
+      }
+      
+      // For development and diagnostic purposes, check if we can extract tenant ID
+      // This is a fallback mechanism to allow debugging
+      if (isDevMode) {
+        const { extractTenantId } = require('./tenant');
+        const tenantId = extractTenantId(req);
+        
+        if (tenantId) {
+          console.log(`AUTH: Using fallback tenant ID: ${tenantId.substring(0, 8)}`);
+          req.tenantId = tenantId;
+          next();
+          return;
+        }
+      }
+      
+      return res.status(401).json({ error: 'Invalid token', details: error.message });
     }
-    
-    // Add user to request object
-    req.user = user;
-    req.tenantId = user.tenant_id;
-    
-    next();
   } catch (error) {
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({ 
-        error: 'Invalid token' 
-      });
-    }
-    
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({ 
-        error: 'Token expired' 
-      });
-    }
-    
     console.error('Authentication error:', error);
-    res.status(500).json({ 
-      error: 'Server error during authentication' 
-    });
+    return res.status(500).json({ error: 'Server error', details: error.message });
   }
 };
 

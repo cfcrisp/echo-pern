@@ -1,264 +1,135 @@
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { 
-  ChevronRight, MessageSquare, Pencil, Plus, Trash2,
-  ChevronDown, MoreHorizontal, ExternalLink,
-  ArrowUpDown, ArrowUp, ArrowDown, Users, Lightbulb, Target
+  ChevronRight, MessageSquare, Pencil, Plus, Trash2, 
+  MoreHorizontal, ExternalLink, Users,
+  ArrowUpDown, ArrowUp, ArrowDown, Filter, X
 } from 'lucide-react';
+import React from 'react';
 import { AddFeedbackModal, EditFeedbackModal } from "@/components/shared";
+import apiClient from '@/services/apiClient';
+import { useAuth } from '@/context/AuthContext';
 
-type Sentiment = 'positive' | 'neutral' | 'negative';
+// Define types for better type safety
+type FeedbackSentiment = 'positive' | 'neutral' | 'negative';
+type FeedbackStatus = 'new' | 'in_review' | 'addressed' | 'rejected';
 
-type FeedbackItem = {
+type SortColumn = 'title' | 'sentiment' | 'status' | 'customer_name' | 'createdAt' | null;
+type SortDirection = 'asc' | 'desc';
+
+type FilterState = {
+  sentiment: FeedbackSentiment | 'all';
+  status: FeedbackStatus | 'all';
+  customer: string | 'all';
+};
+
+type Feedback = {
   id: string;
   title: string;
   description: string;
-  sentiment: Sentiment;
-  customer: string;
-  customerId: string;
+  sentiment: FeedbackSentiment;
+  status: FeedbackStatus;
+  customer_name?: string;
+  customer_id?: string;
   createdAt: string;
 };
 
-// Define sort types
-type SortColumn = keyof FeedbackItem | null;
-type SortDirection = 'asc' | 'desc';
-
-// Sample feedback data - in a real app, this would come from an API
-const mockFeedbackData: FeedbackItem[] = [
-  {
-    id: "1",
-    title: "Love the new dashboard layout!",
-    description: "The new dashboard layout is much more intuitive and helps me find what I need quickly. Great improvement!",
-    sentiment: "positive",
-    customer: "Acme Corp",
-    customerId: "1",
-    createdAt: "2 days ago"
-  },
-  {
-    id: "2",
-    title: "Feature request for export options",
-    description: "It would be helpful to have more export options for reports, especially PDF and Excel formats.",
-    sentiment: "neutral",
-    customer: "TechStart Ltd",
-    customerId: "2",
-    createdAt: "1 week ago"
-  },
-  {
-    id: "3",
-    title: "Mobile app keeps crashing",
-    description: "The mobile app crashes whenever I try to create a new initiative. This has been happening for the last two updates.",
-    sentiment: "negative",
-    customer: "Enterprise Solutions Inc",
-    customerId: "3",
-    createdAt: "3 days ago"
-  },
-  {
-    id: "4",
-    title: "Great customer support experience",
-    description: "Your support team was incredibly helpful in resolving my issue with data import. They went above and beyond!",
-    sentiment: "positive",
-    customer: "Startup Ventures",
-    customerId: "4",
-    createdAt: "5 days ago"
-  },
-  {
-    id: "5",
-    title: "Confusing navigation structure",
-    description: "I find it difficult to navigate between different sections of the app. The menu structure is not intuitive.",
-    sentiment: "negative",
-    customer: "Global Industries",
-    customerId: "5",
-    createdAt: "1 day ago"
-  },
-  {
-    id: "6",
-    title: "Love the new reporting features",
-    description: "The new reporting dashboard is amazing! So much easier to get insights now.",
-    sentiment: "positive",
-    customer: "Local Business LLC",
-    customerId: "6",
-    createdAt: "4 days ago"
-  }
-];
-
-const getSentimentColor = (sentiment: Sentiment) => {
-  switch (sentiment) {
-    case 'positive':
-      return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
-    case 'neutral':
-      return 'bg-slate-100 text-slate-700 dark:bg-slate-800/50 dark:text-slate-400';
-    case 'negative':
-      return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
-    default:
-      return 'bg-slate-100 text-slate-700 dark:bg-slate-800/50 dark:text-slate-400';
-  }
-};
-
-const Feedback: React.FC = () => {
-  const [filter, setFilter] = useState<'all' | 'positive' | 'neutral' | 'negative'>('all');
-  
-  const filteredFeedback = filter === 'all' 
-    ? mockFeedbackData 
-    : mockFeedbackData.filter(item => item.sentiment === filter);
-
-  // Handler for saving new feedback
-  const handleSaveFeedback = (feedback: {
-    title: string;
-    description: string;
-    sentiment: Sentiment;
-    customerId?: string;
-    initiativeId?: string;
-  }) => {
-    console.log('New feedback:', feedback);
-    // In a real app, this would make an API call to save the feedback
-  };
-
-  // Handler for updating existing feedback
-  const handleUpdateFeedback = (id: string, updatedFeedback: {
-    title: string;
-    description: string;
-    sentiment: Sentiment;
-    customerId?: string;
-    initiativeId?: string;
-  }) => {
-    console.log('Updating feedback:', id, updatedFeedback);
-    // In a real app, this would make an API call to update the feedback
-  };
-
-  // Mock initiatives data for dropdown
-  const mockInitiatives = [
-    { id: '1', title: 'Redesign User Interface' },
-    { id: '2', title: 'Implement New Authentication System' },
-    { id: '3', title: 'Optimize Database Queries' },
-    { id: '4', title: 'Develop API Documentation' },
-    { id: '5', title: 'Implement Analytics Dashboard' },
-  ];
-
-  // Mock customers data for dropdown
-  const mockCustomers = [
-    { id: '1', name: 'Acme Corp' },
-    { id: '2', name: 'TechStart Ltd' },
-    { id: '3', name: 'Enterprise Solutions Inc' },
-    { id: '4', name: 'Startup Ventures' },
-    { id: '5', name: 'Global Industries' },
-    { id: '6', name: 'Local Business LLC' },
-    { id: '7', name: 'Innovative Tech' },
-    { id: '8', name: 'Strategic Partners Co' },
-  ];
-
-  return (
-    <div>
-      {/* Header with breadcrumb and improved styling */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <div className="flex items-center gap-1 text-sm text-gray-500 mb-1">
-            <Link to="/" className="hover:text-gray-700">Home</Link>
-            <ChevronRight className="h-3 w-3" />
-            <span className="text-gray-700">Feedback</span>
-          </div>
-          <h1 className="text-2xl font-bold">Customer Feedback</h1>
-          <p className="text-gray-500 mt-1">Collect and manage feedback from your customers.</p>
-        </div>
-        <div>
-          <AddFeedbackModal 
-            onSave={handleSaveFeedback} 
-            customers={mockCustomers}
-            initiatives={mockInitiatives} 
-          />
-        </div>
-      </div>
-      
-      <Tabs value={filter} onValueChange={(value) => setFilter(value as any)} className="mb-6">
-        <TabsList>
-          <TabsTrigger value="all">All Feedback</TabsTrigger>
-          <TabsTrigger value="positive">Positive</TabsTrigger>
-          <TabsTrigger value="neutral">Neutral</TabsTrigger>
-          <TabsTrigger value="negative">Negative</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="all" className="space-y-4">
-          <FeedbackTable 
-            feedback={filteredFeedback} 
-            initiatives={mockInitiatives}
-            customers={mockCustomers}
-            onUpdateFeedback={handleUpdateFeedback}
-          />
-        </TabsContent>
-        
-        <TabsContent value="positive" className="space-y-4">
-          <FeedbackTable 
-            feedback={filteredFeedback} 
-            initiatives={mockInitiatives}
-            customers={mockCustomers}
-            onUpdateFeedback={handleUpdateFeedback}
-          />
-        </TabsContent>
-        
-        <TabsContent value="neutral" className="space-y-4">
-          <FeedbackTable 
-            feedback={filteredFeedback} 
-            initiatives={mockInitiatives}
-            customers={mockCustomers}
-            onUpdateFeedback={handleUpdateFeedback}
-          />
-        </TabsContent>
-        
-        <TabsContent value="negative" className="space-y-4">
-          <FeedbackTable 
-            feedback={filteredFeedback} 
-            initiatives={mockInitiatives}
-            customers={mockCustomers}
-            onUpdateFeedback={handleUpdateFeedback}
-          />
-        </TabsContent>
-      </Tabs>
-      
-      {/* Empty state - will be shown conditionally when there's no feedback */}
-      {filteredFeedback.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-12 px-4 border-2 border-dashed border-gray-300 rounded-lg mt-6 dark:border-gray-700">
-          <div className="bg-gray-100 p-3 rounded-full mb-4 dark:bg-gray-800">
-            <MessageSquare className="h-6 w-6 text-gray-500 dark:text-gray-400" />
-          </div>
-          <h3 className="text-lg font-medium mb-1 dark:text-gray-200">No feedback yet</h3>
-          <p className="text-gray-500 text-center mb-4 dark:text-gray-400">Start collecting feedback from your customers to improve your product.</p>
-          <AddFeedbackModal 
-            onSave={handleSaveFeedback} 
-            customers={mockCustomers}
-            initiatives={mockInitiatives} 
-          />
-        </div>
-      )}
-    </div>
-  );
-};
-
-const FeedbackTable: React.FC<{ 
-  feedback: FeedbackItem[];
-  initiatives: { id: string; title: string }[];
-  customers: { id: string; name: string }[];
-  onUpdateFeedback: (id: string, updatedFeedback: {
-    title: string;
-    description: string;
-    sentiment: Sentiment;
-    customerId?: string;
-    initiativeId?: string;
-  }) => void;
-}> = ({ feedback, initiatives, customers, onUpdateFeedback }) => {
-  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+// Feedback Component
+const Feedback = () => {
+  // State variables
+  const [activeTab, setActiveTab] = useState("all");
   const [showMenu, setShowMenu] = useState<Record<string, boolean>>({});
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [sortColumn, setSortColumn] = useState<SortColumn>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [feedback, setFeedback] = useState<Feedback[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
+  const [customers, setCustomers] = useState<Array<{ id: string; name: string }>>([]);
+  const [initiatives, setInitiatives] = useState<Array<{ id: string; title: string }>>([]);
   
-  // Toggle expanded state for a row
-  const toggleRowExpanded = (id: string) => {
-    setExpandedRows(prev => ({
-      ...prev,
-      [id]: !prev[id]
-    }));
-  };
+  // Filter state
+  const [filters, setFilters] = useState<FilterState>({
+    sentiment: 'all',
+    status: 'all',
+    customer: 'all'
+  });
+  
+  // Fetch customers and initiatives when the component mounts
+  useEffect(() => {
+    const fetchRelatedData = async () => {
+      try {
+        // Fetch customers
+        const customersData = await apiClient.customers.getAll();
+        if (Array.isArray(customersData)) {
+          setCustomers(
+            customersData.map((customer: any) => ({
+              id: customer.id,
+              name: customer.name
+            }))
+          );
+        }
+        
+        // Fetch initiatives
+        const initiativesData = await apiClient.initiatives.getAll();
+        if (Array.isArray(initiativesData)) {
+          setInitiatives(
+            initiativesData.map((initiative: any) => ({
+              id: initiative.id,
+              title: initiative.title
+            }))
+          );
+        }
+      } catch (err) {
+        console.error('Error fetching related data:', err);
+      }
+    };
+    
+    fetchRelatedData();
+  }, []);
+  
+  // Fetch feedback data when component mounts
+  useEffect(() => {
+    const fetchFeedback = async () => {
+      try {
+        setLoading(true);
+        const data = await apiClient.feedback.getAll();
+        
+        // Format the data to match our Feedback type if needed
+        const formattedData = Array.isArray(data) ? data.map((item: any) => ({
+          id: item.id,
+          title: item.title,
+          description: item.description || '',
+          sentiment: item.sentiment || 'neutral',
+          status: item.status || 'new',
+          customer_name: item.customer_name || 'Unknown',
+          customer_id: item.customer_id,
+          createdAt: item.created_at || 'Recently'
+        })) : [];
+        
+        setFeedback(formattedData);
+        setError(null);
+      } catch (err: any) {
+        console.error('Error fetching feedback:', err);
+        if (err.message === 'Tenant not found') {
+          // If tenant not found, set empty array and don't show error
+          setFeedback([]);
+          setError(null);
+        } else {
+          setError('Failed to load feedback. Please try again later.');
+          setFeedback([]);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFeedback();
+  }, []);
   
   // Toggle menu visibility
   const toggleMenu = (id: string) => {
@@ -272,6 +143,28 @@ const FeedbackTable: React.FC<{
     });
   };
   
+  // Toggle filter menu
+  const toggleFilterMenu = () => {
+    setShowFilterMenu(prev => !prev);
+  };
+  
+  // Clear all filters
+  const clearAllFilters = () => {
+    setFilters({
+      sentiment: 'all',
+      status: 'all',
+      customer: 'all'
+    });
+  };
+  
+  // Handle filter changes
+  const handleFilterChange = (filterType: keyof FilterState, value: string) => {
+    setFilters(prev => ({
+      ...prev,
+      [filterType]: value
+    }));
+  };
+  
   // Handle column sort
   const handleSort = (column: SortColumn) => {
     if (sortColumn === column) {
@@ -283,18 +176,150 @@ const FeedbackTable: React.FC<{
       setSortDirection('asc');
     }
   };
+
+  // Handler for saving new feedback
+  const handleSaveFeedback = async (feedbackItem: {
+    title: string;
+    description: string;
+    sentiment: FeedbackSentiment;
+    status?: FeedbackStatus;
+    customer_id?: string;
+    initiative_ids?: string[];
+  }) => {
+    try {
+      setLoading(true);
+      // Create new feedback via API with correct property mapping
+      const apiFeedback = {
+        content: feedbackItem.title, // Required for compatibility with the API
+        title: feedbackItem.title,
+        description: feedbackItem.description,
+        customer_id: feedbackItem.customer_id || '',
+        sentiment: feedbackItem.sentiment,
+        source: 'manual',
+        initiative_ids: feedbackItem.initiative_ids || []
+      };
+      
+      console.log('Creating feedback with data:', apiFeedback);
+      const newFeedback = await apiClient.feedback.create(apiFeedback);
+      
+      // Update the local state with the new feedback
+      setFeedback(prevFeedback => [...prevFeedback, {
+        id: newFeedback.id,
+        title: feedbackItem.title,
+        description: feedbackItem.description,
+        sentiment: feedbackItem.sentiment,
+        status: newFeedback.status || 'new',
+        customer_name: newFeedback.customer_name || 'Unknown',
+        customer_id: feedbackItem.customer_id,
+        createdAt: 'Just now'
+      }]);
+    } catch (err: any) {
+      console.error('Error creating feedback:', err);
+      alert('Failed to create feedback. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handler for updating feedback
+  const handleUpdateFeedback = async (id: string, updatedFeedback: {
+    title?: string;
+    description?: string;
+    sentiment?: FeedbackSentiment;
+    status?: FeedbackStatus;
+    customer_id?: string;
+  }) => {
+    try {
+      setLoading(true);
+      
+      // Create API-compatible update object
+      const apiUpdate: any = {};
+      
+      if (updatedFeedback.title || updatedFeedback.description) {
+        // Get the current feedback item
+        const currentFeedback = feedback.find(f => f.id === id);
+        if (currentFeedback) {
+          const title = updatedFeedback.title || currentFeedback.title;
+          const description = updatedFeedback.description || currentFeedback.description;
+          apiUpdate.content = `${title}: ${description}`;
+        }
+      }
+      
+      if (updatedFeedback.sentiment) {
+        apiUpdate.sentiment = updatedFeedback.sentiment;
+      }
+      
+      // Update feedback via API
+      await apiClient.feedback.update(id, apiUpdate);
+      
+      // Update the local state
+      setFeedback(prevFeedback => prevFeedback.map(item => 
+        item.id === id ? { ...item, ...updatedFeedback } : item
+      ));
+    } catch (err: any) {
+      console.error('Error updating feedback:', err);
+      alert('Failed to update feedback. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handler for deleting feedback
+  const handleDeleteFeedback = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this feedback item? This action cannot be undone.")) {
+      try {
+        setLoading(true);
+        // Delete feedback via API
+        await apiClient.feedback.delete(id);
+        
+        // Update the local state
+        setFeedback(prevFeedback => prevFeedback.filter(item => item.id !== id));
+      } catch (err) {
+        console.error('Error deleting feedback:', err);
+        alert('Failed to delete feedback. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  // Get filtered feedback based on active tab and filters
+  let filteredFeedback = feedback;
+  
+  // Filter by tab first (all, positive, negative)
+  if (activeTab === 'positive') {
+    filteredFeedback = filteredFeedback.filter(item => item.sentiment === 'positive');
+  } else if (activeTab === 'negative') {
+    filteredFeedback = filteredFeedback.filter(item => item.sentiment === 'negative');
+  }
+  
+  // Apply additional filters
+  if (filters.sentiment !== 'all') {
+    filteredFeedback = filteredFeedback.filter(item => item.sentiment === filters.sentiment);
+  }
+  
+  if (filters.status !== 'all') {
+    filteredFeedback = filteredFeedback.filter(item => item.status === filters.status);
+  }
+  
+  if (filters.customer !== 'all') {
+    filteredFeedback = filteredFeedback.filter(item => item.customer_id === filters.customer);
+  }
   
   // Sort feedback based on current sort state
-  let sortedFeedback = [...feedback];
   if (sortColumn) {
-    sortedFeedback = sortedFeedback.sort((a, b) => {
-      const aValue = a[sortColumn];
-      const bValue = b[sortColumn];
+    filteredFeedback = [...filteredFeedback].sort((a, b) => {
+      let aValue = a[sortColumn];
+      let bValue = b[sortColumn];
       
-      if (aValue < bValue) {
+      // Handle undefined values (treat them as empty strings)
+      const aCompare = aValue !== undefined ? aValue : '';
+      const bCompare = bValue !== undefined ? bValue : '';
+      
+      if (aCompare < bCompare) {
         return sortDirection === 'asc' ? -1 : 1;
       }
-      if (aValue > bValue) {
+      if (aCompare > bCompare) {
         return sortDirection === 'asc' ? 1 : -1;
       }
       return 0;
@@ -311,215 +336,419 @@ const FeedbackTable: React.FC<{
       : <ArrowDown className="ml-1 h-3 w-3" />;
   };
   
+  // Helper function to get sentiment badge styling
+  const getSentimentBadgeClass = (sentiment: FeedbackSentiment): string => {
+    switch(sentiment) {
+      case 'positive':
+        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
+      case 'neutral':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
+      case 'negative':
+        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400';
+    }
+  };
+  
+  // Helper function to get status badge styling
+  const getStatusBadgeClass = (status: FeedbackStatus): string => {
+    switch(status) {
+      case 'new':
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400';
+      case 'in_review':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
+      case 'addressed':
+        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
+      case 'rejected':
+        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400';
+    }
+  };
+  
   return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[30px]"></TableHead>
-            <TableHead 
-              className="w-[250px] cursor-pointer"
-              onClick={() => handleSort('title')}
-            >
-              <div className="flex items-center">
-                Feedback
-                {getSortIcon('title')}
-              </div>
-            </TableHead>
-            <TableHead 
-              className="w-[120px] cursor-pointer"
-              onClick={() => handleSort('customer')}
-            >
-              <div className="flex items-center">
-                Customer
-                {getSortIcon('customer')}
-              </div>
-            </TableHead>
-            <TableHead 
-              className="w-[100px] cursor-pointer"
-              onClick={() => handleSort('sentiment')}
-            >
-              <div className="flex items-center">
-                Sentiment
-                {getSortIcon('sentiment')}
-              </div>
-            </TableHead>
-            <TableHead 
-              className="w-[100px] cursor-pointer"
-              onClick={() => handleSort('createdAt')}
-            >
-              <div className="flex items-center">
-                Date
-                {getSortIcon('createdAt')}
-              </div>
-            </TableHead>
-            <TableHead className="w-[80px]">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {sortedFeedback.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={6} className="h-24 text-center">
-                No feedback found.
-              </TableCell>
-            </TableRow>
-          ) : (
-            sortedFeedback.map((item) => (
-              <React.Fragment key={item.id}>
-                <TableRow className={expandedRows[item.id] ? "border-b-0" : ""}>
-                  <TableCell className="w-[30px] pr-0">
+    <div className="container mx-auto p-4">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Customer Feedback</h1>
+        <div className="flex items-center space-x-2">
+          <AddFeedbackModal 
+            onSave={handleSaveFeedback} 
+            initiatives={initiatives}
+            customers={customers}
+          />
+        </div>
+      </div>
+      
+      {/* Tabs for filtering feedback */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
+        <TabsList>
+          <TabsTrigger value="all">All Feedback</TabsTrigger>
+          <TabsTrigger value="positive">
+            <div className="flex items-center gap-1 text-green-500 dark:text-green-400">
+              <span>Positive</span>
+            </div>
+          </TabsTrigger>
+          <TabsTrigger value="negative">
+            <div className="flex items-center gap-1 text-red-500 dark:text-red-400">
+              <span>Negative</span>
+            </div>
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      {/* Loading state */}
+      {loading && (
+        <div className="flex justify-center items-center p-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      )}
+
+      {/* Error state */}
+      {error && (
+        <div className="p-4 text-red-500 border border-red-300 bg-red-50 rounded-md dark:bg-red-900/20 dark:border-red-800">
+          {error}
+        </div>
+      )}
+
+      {/* Feedback Table - Only show when not loading and no errors */}
+      {!loading && !error && (
+        <>
+          {/* Filter row */}
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <div className="flex items-center space-x-2">
+              {/* Active filters */}
+              <div className="flex items-center flex-wrap gap-2">
+                {filters.sentiment !== 'all' && (
+                  <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200">
+                    Sentiment: 
+                    <span className={`ml-1 ${
+                      filters.sentiment === 'positive' ? 'text-green-600 dark:text-green-400' : 
+                      filters.sentiment === 'negative' ? 'text-red-600 dark:text-red-400' : 
+                      'text-blue-600 dark:text-blue-400'
+                    }`}>
+                      {filters.sentiment}
+                    </span>
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      className="h-7 w-7 p-0"
-                      onClick={() => toggleRowExpanded(item.id)}
+                      onClick={() => handleFilterChange('sentiment', 'all')}
+                      className="h-5 w-5 p-0 ml-1 hover:bg-gray-200 dark:hover:bg-gray-700"
                     >
-                      <ChevronDown className={`h-4 w-4 transition-transform ${expandedRows[item.id] ? "transform rotate-180" : ""}`} />
+                      <X className="h-3 w-3" />
                     </Button>
-                  </TableCell>
-                  <TableCell className="font-medium">{item.title}</TableCell>
-                  <TableCell>{item.customer}</TableCell>
-                  <TableCell>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getSentimentColor(item.sentiment)}`}>
-                      {item.sentiment.charAt(0).toUpperCase() + item.sentiment.slice(1)}
-                    </span>
-                  </TableCell>
-                  <TableCell>{item.createdAt}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <EditFeedbackModal
-                        feedback={item}
-                        initiatives={initiatives}
-                        customers={customers}
-                        onUpdate={onUpdateFeedback}
-                        triggerButtonSize="icon"
-                      />
-                      <div className="relative">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-7 w-7 p-0"
-                          onClick={() => toggleMenu(item.id)}
-                        >
-                          <MoreHorizontal className="h-3.5 w-3.5" />
-                        </Button>
-                        
-                        {showMenu[item.id] && (
-                          <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded shadow-lg z-10 dark:bg-card dark:border-border">
-                            <div 
-                              className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center dark:hover:bg-gray-800/50 dark:text-gray-200"
-                              onClick={() => {
-                                console.log('Edit feedback', item.id);
-                                toggleMenu(item.id);
-                              }}
-                            >
-                              <Pencil className="h-3.5 w-3.5 mr-2" /> Edit
-                            </div>
-                            <div 
-                              className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center dark:hover:bg-gray-800/50 dark:text-gray-200"
-                              onClick={() => {
-                                console.log('View feedback details', item.id);
-                                toggleMenu(item.id);
-                              }}
-                            >
-                              <ExternalLink className="h-3.5 w-3.5 mr-2" /> View Details
-                            </div>
-                            <div 
-                              className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center text-red-600 dark:hover:bg-gray-800/50"
-                              onClick={() => {
-                                console.log('Delete feedback', item.id);
-                                toggleMenu(item.id);
-                              }}
-                            >
-                              <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
-                            </div>
-                          </div>
-                        )}
+                  </div>
+                )}
+                
+                {filters.status !== 'all' && (
+                  <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200">
+                    Status: {filters.status.replace('_', ' ')}
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => handleFilterChange('status', 'all')}
+                      className="h-5 w-5 p-0 ml-1 hover:bg-gray-200 dark:hover:bg-gray-700"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+                
+                {filters.customer !== 'all' && (
+                  <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200">
+                    Customer: {customers.find(c => c.id === filters.customer)?.name || 'Unknown'}
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => handleFilterChange('customer', 'all')}
+                      className="h-5 w-5 p-0 ml-1 hover:bg-gray-200 dark:hover:bg-gray-700"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+                
+                {(filters.sentiment !== 'all' || filters.status !== 'all' || filters.customer !== 'all') && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-7 px-2 text-xs hover:bg-gray-100 dark:hover:bg-gray-800 hidden sm:flex"
+                    onClick={clearAllFilters}
+                  >
+                    Clear all
+                  </Button>
+                )}
+              </div>
+              
+              {/* Filter button */}
+              <div className="relative">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={toggleFilterMenu}
+                  className="h-7 gap-1 text-xs"
+                >
+                  <Filter className="h-3 w-3" />
+                  <span>Filter</span>
+                </Button>
+                
+                {showFilterMenu && (
+                  <div className="absolute left-0 mt-1 w-40 bg-white border border-gray-200 rounded shadow-lg z-10 dark:bg-card dark:border-gray-700">
+                    <div className="p-2 border-b border-gray-100 dark:border-gray-800">
+                      <h4 className="text-xs font-medium mb-1">Sentiment</h4>
+                      <div className="space-y-1">
+                        {['all', 'positive', 'neutral', 'negative'].map(sentiment => (
+                          <label key={sentiment} className="flex items-center space-x-2 text-xs cursor-pointer">
+                            <input 
+                              type="radio"
+                              checked={filters.sentiment === sentiment}
+                              onChange={() => handleFilterChange('sentiment', sentiment)}
+                              className="rounded-full"
+                            />
+                            <span>{sentiment === 'all' ? 'All Sentiments' : sentiment}</span>
+                          </label>
+                        ))}
                       </div>
                     </div>
-                  </TableCell>
-                </TableRow>
-                
-                {/* Expanded Row Section */}
-                {expandedRows[item.id] && (
-                  <TableRow className="bg-slate-50 dark:bg-gray-800/50">
-                    <TableCell colSpan={6} className="p-0">
-                      <div className="p-4">
-                        <div className="space-y-4">
-                          {/* Description section with cleaner layout */}
-                          <div className="mb-4">
-                            <h4 className="text-xs font-semibold mb-2 text-slate-700 dark:text-gray-300 uppercase tracking-wider">Feedback Details</h4>
-                            <p className="text-sm text-slate-600 dark:text-gray-300">{item.description}</p>
-                          </div>
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* Left column - Customer info */}
-                            <div className="space-y-3">
-                              <div>
-                                <h4 className="text-xs font-semibold mb-2 text-slate-700 dark:text-gray-300 uppercase tracking-wider">Customer</h4>
-                                <div className="bg-slate-50 dark:bg-gray-800/70 p-3 rounded-lg border border-slate-200 dark:border-gray-700 hover:border-slate-300 dark:hover:border-gray-600 transition-colors">
-                                  <div className="flex items-center">
-                                    <Users className="h-3.5 w-3.5 mr-2 text-blue-500/70 dark:text-blue-400/50" />
-                                    <p className="text-sm font-medium dark:text-gray-200">{item.customer}</p>
-                                  </div>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm" 
-                                    className="w-full justify-start mt-2 text-xs h-7 text-slate-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary"
-                                  >
-                                    <ChevronRight className="h-3 w-3 mr-1" />
-                                    View Customer Details
-                                  </Button>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            {/* Right column - Sentiment info */}
-                            <div className="space-y-3">
-                              <div>
-                                <h4 className="text-xs font-semibold mb-2 text-slate-700 dark:text-gray-300 uppercase tracking-wider">Sentiment Analysis</h4>
-                                <div className="bg-slate-50 dark:bg-gray-800/70 p-3 rounded-lg border border-slate-200 dark:border-gray-700 hover:border-slate-300 dark:hover:border-gray-600 transition-colors">
-                                  <div className="flex items-center">
-                                    <div className={`mr-3 px-2 py-1 text-xs font-medium rounded-full ${getSentimentColor(item.sentiment)}`}>
-                                      {item.sentiment.charAt(0).toUpperCase() + item.sentiment.slice(1)}
-                                    </div>
-                                    <p className="text-sm text-slate-600 dark:text-gray-300">
-                                      {item.sentiment === 'positive' ? 'Customer is satisfied' :
-                                       item.sentiment === 'negative' ? 'Customer is dissatisfied' :
-                                       'Customer has mixed or neutral feelings'}
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          {/* Quick action buttons */}
-                          <div className="flex flex-wrap gap-2 mt-2 pt-3 border-t border-slate-100 dark:border-gray-700">
-                            <h4 className="text-xs font-semibold text-slate-700 dark:text-gray-300 mr-2 self-center">Quick Actions:</h4>
-                            <Button variant="outline" size="sm" className="h-7 text-xs">
-                              <Users className="h-3 w-3 mr-1 text-blue-500" />
-                              View Customer
-                            </Button>
-                            <Button variant="outline" size="sm" className="h-7 text-xs">
-                              <Lightbulb className="h-3 w-3 mr-1 text-amber-500" />
-                              Create Idea
-                            </Button>
-                            <Button variant="outline" size="sm" className="h-7 text-xs">
-                              <Target className="h-3 w-3 mr-1 text-primary" />
-                              Link to Initiative
-                            </Button>
-                          </div>
+                    
+                    <div className="p-2 border-b border-gray-100 dark:border-gray-800">
+                      <h4 className="text-xs font-medium mb-1">Status</h4>
+                      <div className="space-y-1">
+                        {['all', 'new', 'in_review', 'addressed', 'rejected'].map(status => (
+                          <label key={status} className="flex items-center space-x-2 text-xs cursor-pointer">
+                            <input 
+                              type="radio"
+                              checked={filters.status === status}
+                              onChange={() => handleFilterChange('status', status)}
+                              className="rounded-full"
+                            />
+                            <span>{status === 'all' ? 'All Statuses' : status.replace('_', ' ')}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    {customers.length > 0 && (
+                      <div className="p-2">
+                        <h4 className="text-xs font-medium mb-1">Customer</h4>
+                        <div className="space-y-1 max-h-32 overflow-y-auto">
+                          <label className="flex items-center space-x-2 text-xs cursor-pointer">
+                            <input 
+                              type="radio"
+                              checked={filters.customer === 'all'}
+                              onChange={() => handleFilterChange('customer', 'all')}
+                              className="rounded-full"
+                            />
+                            <span>All Customers</span>
+                          </label>
+                          {customers.map(customer => (
+                            <label key={customer.id} className="flex items-center space-x-2 text-xs cursor-pointer">
+                              <input 
+                                type="radio"
+                                checked={filters.customer === customer.id}
+                                onChange={() => handleFilterChange('customer', customer.id as string)}
+                                className="rounded-full"
+                              />
+                              <span>{customer.name}</span>
+                            </label>
+                          ))}
                         </div>
                       </div>
+                    )}
+                    
+                    <div className="flex items-center justify-between p-2 border-t border-gray-100 dark:border-gray-800">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-7 text-xs"
+                        onClick={clearAllFilters}
+                      >
+                        Clear all
+                      </Button>
+                      <Button 
+                        variant="secondary" 
+                        size="sm" 
+                        className="h-7 text-xs"
+                        onClick={toggleFilterMenu}
+                      >
+                        Apply
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div className="text-sm text-gray-500">
+              Showing <span className="font-medium text-gray-900 dark:text-gray-200">{filteredFeedback.length}</span> of <span className="font-medium text-gray-900 dark:text-gray-200">{feedback.length}</span> feedback items
+            </div>
+          </div>
+          
+          {/* Feedback Table */}
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead 
+                    className="w-[300px] cursor-pointer"
+                    onClick={() => handleSort('title')}
+                  >
+                    <div className="flex items-center">
+                      Feedback
+                      {getSortIcon('title')}
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="w-[120px] cursor-pointer"
+                    onClick={() => handleSort('sentiment')}
+                  >
+                    <div className="flex items-center">
+                      Sentiment
+                      {getSortIcon('sentiment')}
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="w-[120px] cursor-pointer"
+                    onClick={() => handleSort('status')}
+                  >
+                    <div className="flex items-center">
+                      Status
+                      {getSortIcon('status')}
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="hidden sm:table-cell w-[150px] cursor-pointer"
+                    onClick={() => handleSort('customer_name')}
+                  >
+                    <div className="flex items-center">
+                      Customer
+                      {getSortIcon('customer_name')}
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="hidden sm:table-cell w-[120px] cursor-pointer"
+                    onClick={() => handleSort('createdAt')}
+                  >
+                    <div className="flex items-center">
+                      Date
+                      {getSortIcon('createdAt')}
+                    </div>
+                  </TableHead>
+                  <TableHead className="w-[80px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredFeedback.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-24 text-center">
+                      No feedback found matching the current filters.
                     </TableCell>
                   </TableRow>
+                ) : (
+                  filteredFeedback.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell className="font-medium">
+                        <div>
+                          <div className="font-medium">{item.title}</div>
+                          <div className="text-sm text-gray-500 line-clamp-1 dark:text-gray-400">
+                            {item.description}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getSentimentBadgeClass(item.sentiment)}`}>
+                          {item.sentiment}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeClass(item.status)}`}>
+                          {item.status.replace('_', ' ')}
+                        </span>
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">
+                        {item.customer_name || 'Unknown'}
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell text-sm text-gray-500 dark:text-gray-400">
+                        {item.createdAt}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <EditFeedbackModal
+                            feedback={{
+                              id: item.id,
+                              title: item.title,
+                              description: item.description,
+                              sentiment: item.sentiment,
+                              customerId: item.customer_id,
+                              customer: item.customer_name
+                            }}
+                            initiatives={[]}
+                            customers={customers.map(c => ({ id: c.id, name: c.name }))}
+                            onUpdate={(id, updatedData) => {
+                              // Map EditFeedbackModal fields to our API format
+                              handleUpdateFeedback(id, {
+                                title: updatedData.title,
+                                description: updatedData.description,
+                                sentiment: updatedData.sentiment,
+                                customer_id: updatedData.customerId
+                              });
+                            }}
+                            triggerButtonSize="icon"
+                          />
+                          
+                          <div className="relative">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-7 w-7 p-0"
+                              onClick={() => toggleMenu(item.id)}
+                            >
+                              <MoreHorizontal className="h-3.5 w-3.5" />
+                            </Button>
+                            
+                            {showMenu[item.id] && (
+                              <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded shadow-lg z-10 dark:bg-card dark:border-border">
+                                <div 
+                                  className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center dark:hover:bg-gray-800/50 dark:text-gray-200"
+                                  onClick={() => {
+                                    console.log('View feedback details', item.id);
+                                    toggleMenu(item.id);
+                                  }}
+                                >
+                                  <ExternalLink className="h-3.5 w-3.5 mr-2" /> View Details
+                                </div>
+                                <div 
+                                  className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center text-red-600 dark:hover:bg-gray-800/50"
+                                  onClick={() => {
+                                    handleDeleteFeedback(item.id);
+                                    toggleMenu(item.id);
+                                  }}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
                 )}
-              </React.Fragment>
-            ))
-          )}
-        </TableBody>
-      </Table>
+              </TableBody>
+            </Table>
+          </div>
+        </>
+      )}
+
+      {/* Empty state - will be shown conditionally when there's no feedback */}
+      {!loading && !error && feedback.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-12 px-4 border-2 border-dashed border-gray-300 rounded-lg mt-6 dark:border-gray-700">
+          <div className="bg-gray-100 p-3 rounded-full mb-4 dark:bg-gray-800">
+            <MessageSquare className="h-6 w-6 text-gray-500 dark:text-gray-400" />
+          </div>
+          <h3 className="text-lg font-medium mb-1 dark:text-gray-200">No feedback yet</h3>
+          <p className="text-gray-500 text-center mb-4 dark:text-gray-400">Start collecting feedback from your customers using the Add Feedback button above.</p>
+        </div>
+      )}
     </div>
   );
 };

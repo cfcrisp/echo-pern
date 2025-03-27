@@ -20,6 +20,22 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 type IdeaStatus = 'new' | 'planned' | 'completed' | 'rejected';
 type IdeaPriority = 'urgent' | 'high' | 'medium' | 'low';
@@ -33,7 +49,7 @@ type IdeaModalProps = {
     effort: IdeaEffort;
     status: IdeaStatus;
     initiative_id?: string;
-    customer_id?: string;
+    customer_ids?: string[];
     source: string;
   }) => void;
   initiatives?: Array<{ id: string; title: string }>;
@@ -55,19 +71,36 @@ export function AddIdeaModal({
     effort: 'm' as IdeaEffort,
     status: 'new' as IdeaStatus,
     initiative_id: undefined as string | undefined,
-    customer_id: undefined as string | undefined,
+    customer_ids: [] as string[],
     source: 'internal'
   });
+  const [openCustomerCombobox, setOpenCustomerCombobox] = useState(false);
+  const [openInitiativeCombobox, setOpenInitiativeCombobox] = useState(false);
 
-  const handleChange = (field: string, value: string) => {
+  const handleChange = (field: string, value: any) => {
     setIdea(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleCustomerToggle = (customerId: string) => {
+    setIdea(prev => {
+      const currentCustomers = [...prev.customer_ids];
+      const index = currentCustomers.indexOf(customerId);
+      
+      if (index === -1) {
+        // Add customer
+        return { ...prev, customer_ids: [...currentCustomers, customerId] };
+      } else {
+        // Remove customer
+        currentCustomers.splice(index, 1);
+        return { ...prev, customer_ids: currentCustomers };
+      }
+    });
   };
 
   const handleSubmit = () => {
     const submittedData = {
       ...idea,
-      initiative_id: idea.initiative_id === 'none' ? undefined : idea.initiative_id,
-      customer_id: idea.customer_id === 'none' ? undefined : idea.customer_id
+      initiative_id: idea.initiative_id === 'none' ? undefined : idea.initiative_id
     };
     onSave(submittedData);
     setIdea({
@@ -77,7 +110,7 @@ export function AddIdeaModal({
       effort: 'm' as IdeaEffort,
       status: 'new' as IdeaStatus,
       initiative_id: undefined,
-      customer_id: undefined,
+      customer_ids: [],
       source: 'internal'
     });
     setOpen(false);
@@ -201,21 +234,59 @@ export function AddIdeaModal({
           )}
           {customers.length > 0 && (
             <FormItem>
-              <FormLabel htmlFor="customer_id">Related Customer</FormLabel>
-              <Select 
-                value={idea.customer_id || 'none'} 
-                onValueChange={(value: string) => handleChange('customer_id', value)}
-              >
-                <SelectTrigger id="customer_id">
-                  <SelectValue placeholder="Select a customer (optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {customers.map(customer => (
-                    <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <FormLabel htmlFor="customers">Related Customers</FormLabel>
+              <Popover open={openCustomerCombobox} onOpenChange={setOpenCustomerCombobox}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={openCustomerCombobox}
+                    className="w-full justify-between"
+                  >
+                    {idea.customer_ids.length > 0
+                      ? `${idea.customer_ids.length} selected`
+                      : "Select customers..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                  <Command>
+                    <CommandInput placeholder="Search customers..." />
+                    <CommandEmpty>No customer found.</CommandEmpty>
+                    <CommandGroup>
+                      <ScrollArea className="h-[200px]">
+                        {customers.map((customer) => (
+                          <CommandItem
+                            key={customer.id}
+                            value={customer.id}
+                            onSelect={() => handleCustomerToggle(customer.id)}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                idea.customer_ids.includes(customer.id) ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {customer.name}
+                          </CommandItem>
+                        ))}
+                      </ScrollArea>
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              {idea.customer_ids.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {idea.customer_ids.map(id => {
+                    const customer = customers.find(c => c.id === id);
+                    return customer ? (
+                      <Badge key={id} variant="secondary" className="mr-1 mb-1">
+                        {customer.name}
+                      </Badge>
+                    ) : null;
+                  })}
+                </div>
+              )}
             </FormItem>
           )}
         </div>

@@ -19,8 +19,11 @@ class BaseModel {
    * @returns {Promise<Object>} The created record
    */
   async create(data) {
-    const columns = Object.keys(data);
-    const values = Object.values(data);
+    // Apply validation and defaults
+    const validatedData = await this.validateForCreate(data);
+    
+    const columns = Object.keys(validatedData);
+    const values = Object.values(validatedData);
     const placeholders = values.map((_, i) => `$${i + 1}`);
     
     const query = `
@@ -31,6 +34,28 @@ class BaseModel {
     
     const result = await this.pool.query(query, values);
     return result.rows[0];
+  }
+
+  /**
+   * Validate data before creating a record
+   * @param {Object} data - Data to validate
+   * @returns {Promise<Object>} Validated data with defaults applied
+   */
+  async validateForCreate(data) {
+    // Ensure required tenant_id
+    if (!data.tenant_id) {
+      throw new Error('tenant_id is required');
+    }
+    
+    // Ensure timestamps
+    const now = new Date();
+    const validatedData = {
+      ...data,
+      created_at: data.created_at || now,
+      updated_at: data.updated_at || now
+    };
+    
+    return validatedData;
   }
 
   /**

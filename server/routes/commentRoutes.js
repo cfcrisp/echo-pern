@@ -5,9 +5,48 @@ const express = require('express');
 const { CommentModel } = require('../models');
 const pool = require('../config/database');
 const { authenticate, authorizeCommentAccess } = require('../middleware/auth');
+const { createEntityHandler, listEntityHandler, getEntityByIdHandler } = require('../utils/requestHandlers');
 
 const router = express.Router();
 const commentModel = new CommentModel(pool);
+
+/**
+ * @route   GET /comments
+ * @desc    Get all comments for current tenant with filtering options
+ * @access  Authenticated
+ */
+router.get('/', authenticate, listEntityHandler(
+  commentModel,
+  'findByTenantWithOptions',
+  {
+    allowedFilters: ['entity_type', 'entity_id', 'user_id', 'search'],
+    defaultSort: 'created_at',
+    defaultOrder: 'desc'
+  }
+));
+
+/**
+ * @route   GET /comments/:id
+ * @desc    Get a comment by ID
+ * @access  Authenticated (with proper tenant access)
+ */
+router.get('/:id', authenticate, getEntityByIdHandler(commentModel));
+
+/**
+ * @route   POST /comments
+ * @desc    Create a new comment
+ * @access  Authenticated
+ */
+router.post('/', authenticate, createEntityHandler(
+  commentModel,
+  ['content', 'entity_type', 'entity_id'],
+  (req) => {
+    // Add user_id from authenticated user
+    return {
+      user_id: req.user.id
+    };
+  }
+));
 
 /**
  * @route   PUT /comments/:id

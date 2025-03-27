@@ -10,11 +10,24 @@ import Feedback from './pages/Feedback';
 import Initiatives from './pages/Initiatives';
 import Landing from './pages/Landing';
 import Dashboard from './pages/Home';
-import { AddInitiativeModal } from "@/components/shared";
+import { 
+  AddInitiativeModal, 
+  AddGoalModal, 
+  AddCustomerModal, 
+  AddIdeaModal, 
+  AddFeedbackModal 
+} from "@/components/shared";
 import { ThemeProvider } from '@/context/ThemeContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useAuth } from '@/context/AuthContext';
 import AuthGuard from '@/components/AuthGuard';
+import { 
+  goalsApi, 
+  initiativesApi, 
+  customersApi, 
+  ideasApi, 
+  feedbackApi 
+} from '@/services/apiClient';
 
 // Navigation Item Component
 const NavItem = ({ icon: Icon, label, to, onClick }: { icon: React.ElementType, label: string, to: string, onClick?: () => void }) => {
@@ -61,15 +74,138 @@ function App() {
   const { logout } = useAuth();
   const isLandingPage = location.pathname === '/';
 
-  const handleSaveInitiative = (initiative: {
+  // Handle saving new goals
+  const handleSaveGoal = async (goal: {
+    title: string;
+    description: string;
+    status: 'active' | 'planned' | 'completed';
+    target_date: string;
+    linked_initiatives?: string[];
+  }) => {
+    try {
+      const newGoal = await goalsApi.create(goal);
+      console.log('Goal created:', newGoal);
+      
+      // If there are linked initiatives, update them to point to this goal
+      if (goal.linked_initiatives && goal.linked_initiatives.length > 0 && newGoal.id) {
+        const updatePromises = goal.linked_initiatives.map(initiativeId => 
+          initiativesApi.update(initiativeId, { goal_id: newGoal.id })
+        );
+        await Promise.all(updatePromises);
+      }
+      
+      // Optionally refresh data or navigate
+      if (location.pathname !== '/goals') {
+        navigate('/goals');
+      }
+      return newGoal;
+    } catch (error) {
+      console.error('Error creating goal:', error);
+    }
+  };
+
+  // Handle saving new initiatives
+  const handleSaveInitiative = async (initiative: {
     goal_id?: string;
     title: string;
     description: string;
     status: 'active' | 'planned' | 'completed';
     priority: number;
   }) => {
-    console.log('New initiative:', initiative);
-    // API call here
+    try {
+      // Ensure description is never empty
+      const initiativeData = {
+        ...initiative,
+        description: initiative.description || " " // Default to space if empty
+      };
+      
+      const newInitiative = await initiativesApi.create(initiativeData);
+      console.log('Initiative created:', newInitiative);
+      // Optionally refresh data or navigate
+      if (location.pathname !== '/initiatives') {
+        navigate('/initiatives');
+      }
+      return newInitiative;
+    } catch (error) {
+      console.error('Error creating initiative:', error);
+    }
+  };
+
+  // Handle saving new customers
+  const handleSaveCustomer = async (customer: {
+    name: string;
+    revenue: string;
+    status: 'active' | 'inactive' | 'prospect';
+  }) => {
+    try {
+      // Format customer data to match API requirements
+      const customerData = {
+        name: customer.name,
+        email: '', // Default email since not in the form
+        company: '', // Default company since not in the form
+        status: customer.status === 'prospect' ? 'inactive' : customer.status
+      };
+      
+      const newCustomer = await customersApi.create(customerData);
+      console.log('Customer created:', newCustomer);
+      // Optionally refresh data or navigate
+      if (location.pathname !== '/customers') {
+        navigate('/customers');
+      }
+      return newCustomer;
+    } catch (error) {
+      console.error('Error creating customer:', error);
+    }
+  };
+
+  // Handle saving new ideas
+  const handleSaveIdea = async (idea: {
+    title: string;
+    description: string;
+    priority?: 'urgent' | 'high' | 'medium' | 'low';
+    status?: 'new' | 'planned' | 'in_progress' | 'completed' | 'rejected';
+    customer_id?: string;
+  }) => {
+    try {
+      const newIdea = await ideasApi.create(idea);
+      console.log('Idea created:', newIdea);
+      // Optionally refresh data or navigate
+      if (location.pathname !== '/ideas') {
+        navigate('/ideas');
+      }
+      return newIdea;
+    } catch (error) {
+      console.error('Error creating idea:', error);
+    }
+  };
+
+  // Handle saving new feedback
+  const handleSaveFeedback = async (feedback: {
+    title: string;
+    description: string;
+    sentiment: 'positive' | 'neutral' | 'negative';
+    customer_id?: string;
+    initiative_id?: string;
+  }) => {
+    try {
+      // Format feedback data to match API requirements
+      const feedbackData = {
+        customer_id: feedback.customer_id || '',
+        content: feedback.description,
+        sentiment: feedback.sentiment,
+        source: feedback.title // Using title as source since API expects content and source
+      };
+      
+      const newFeedback = await feedbackApi.create(feedbackData);
+      console.log('Feedback created:', newFeedback);
+      // Optionally refresh data or navigate
+      if (location.pathname !== '/feedback') {
+        navigate('/feedback');
+      }
+      return newFeedback;
+    } catch (error) {
+      console.error('Error creating feedback:', error);
+    }
   };
 
   // Handle user logout
@@ -149,6 +285,7 @@ function App() {
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/goals" element={<Goals />} />
                 <Route path="/initiatives" element={<Initiatives />} />
+                <Route path="/initiatives/:id" element={<Initiatives />} />
                 <Route path="/customers" element={<Customers />} />
                 <Route path="/feedback" element={<Feedback />} />
                 <Route path="/ideas" element={<Ideas />} />
@@ -164,5 +301,3 @@ function App() {
 }
 
 export default App;
-
-// Note: Feedback component is imported from './pages/Feedback' at the top of the file

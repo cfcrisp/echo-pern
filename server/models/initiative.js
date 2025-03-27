@@ -44,6 +44,16 @@ class InitiativeModel extends BaseModel {
   }
   
   /**
+   * Find initiatives by tenant ID (alias for findByTenant)
+   * @param {String} tenantId - The tenant ID
+   * @param {String} status - Optional filter by status
+   * @returns {Promise<Array>} Array of initiatives
+   */
+  async findByTenantId(tenantId, status = null) {
+    return this.findByTenant(tenantId, status);
+  }
+  
+  /**
    * Update initiative status
    * @param {String} id - Initiative ID
    * @param {String} status - New status ('active', 'planned', or 'completed')
@@ -90,27 +100,131 @@ class InitiativeModel extends BaseModel {
   }
   
   /**
+   * Override validateForCreate to add initiative-specific validation
+   * @param {Object} data - Initiative data
+   * @returns {Promise<Object>} Validated initiative data
+   */
+  async validateForCreate(data) {
+    // Call parent validation first
+    const baseValidated = await super.validateForCreate(data);
+    
+    // Initiative-specific validation
+    if (!baseValidated.title) {
+      throw new Error('title is required for initiatives');
+    }
+    
+    if (!baseValidated.status) {
+      throw new Error('status is required for initiatives');
+    }
+    
+    if (!['active', 'planned', 'completed'].includes(baseValidated.status)) {
+      throw new Error('invalid status: must be one of active, planned, completed');
+    }
+    
+    if (baseValidated.priority === undefined || baseValidated.priority === null) {
+      throw new Error('priority is required for initiatives');
+    }
+    
+    if (baseValidated.priority < 1 || baseValidated.priority > 5) {
+      throw new Error('invalid priority: must be between 1 and 5');
+    }
+    
+    // Ensure description is not null or undefined
+    if (baseValidated.description === null || baseValidated.description === undefined) {
+      baseValidated.description = '';
+    }
+    
+    return baseValidated;
+  }
+  
+  /**
    * Create a new initiative with validation
    * @param {Object} initiativeData - Initiative data
    * @returns {Promise<Object>} The created initiative
    */
   async createInitiative(initiativeData) {
-    // Make sure required fields are present
-    if (!initiativeData.tenant_id || !initiativeData.title || !initiativeData.status || !initiativeData.priority) {
-      throw new Error('Missing required fields: tenant_id, title, status, and priority are required');
-    }
-    
-    // Validate status
-    if (!['active', 'planned', 'completed'].includes(initiativeData.status)) {
-      throw new Error('Invalid status. Must be one of: active, planned, completed');
-    }
-    
-    // Validate priority
-    if (initiativeData.priority < 1 || initiativeData.priority > 5) {
-      throw new Error('Invalid priority. Must be between 1 and 5');
-    }
-    
+    // This method is kept for backward compatibility
+    // but delegates to the standard create method
     return this.create(initiativeData);
+  }
+  
+  /**
+   * Find initiatives with full query options support
+   * @param {String} tenantId - The tenant ID
+   * @param {Object} options - Query options (sort, order, limit, offset, filters)
+   * @returns {Promise<Array>} Array of initiatives
+   */
+  async findByTenantWithOptions(tenantId, options = {}) {
+    try {
+      console.log('findByTenantWithOptions called with tenantId:', tenantId);
+      console.log('Options:', JSON.stringify(options));
+      
+      const {
+        sort = 'created_at',
+        order = 'desc',
+        limit = 50,
+        offset = 0,
+        filters = {}
+      } = options;
+      
+      // Build the WHERE clause
+      const conditions = ['tenant_id = $1'];
+      const values = [tenantId];
+      let paramIndex = 2;
+      
+      // Add filters
+      if (filters.status) {
+        conditions.push(`status = $${paramIndex}`);
+        values.push(filters.status);
+        paramIndex++;
+      }
+      
+      if (filters.priority) {
+        conditions.push(`priority = $${paramIndex}`);
+        values.push(filters.priority);
+        paramIndex++;
+      }
+      
+      if (filters.goal_id) {
+        conditions.push(`goal_id = $${paramIndex}`);
+        values.push(filters.goal_id);
+        paramIndex++;
+      }
+      
+      // Handle search if present
+      if (filters.search) {
+        conditions.push(`(title ILIKE $${paramIndex} OR description ILIKE $${paramIndex})`);
+        values.push(`%${filters.search}%`);
+        paramIndex++;
+      }
+      
+      // Ensure the sort field exists
+      const safeSort = ['created_at', 'updated_at', 'title', 'status', 'priority'].includes(sort) 
+        ? sort 
+        : 'created_at';
+      
+      // Build the query
+      const query = `
+        SELECT *
+        FROM ${this.tableName}
+        WHERE ${conditions.join(' AND ')}
+        ORDER BY ${safeSort} ${order}
+        LIMIT $${paramIndex}
+        OFFSET $${paramIndex + 1}
+      `;
+      
+      console.log('Executing query:', query);
+      console.log('With values:', values);
+      
+      values.push(limit, offset);
+      
+      const result = await this.pool.query(query, values);
+      console.log(`Query returned ${result.rows.length} rows`);
+      return result.rows;
+    } catch (error) {
+      console.error('Error in findByTenantWithOptions:', error);
+      throw error;
+    }
   }
 }
 

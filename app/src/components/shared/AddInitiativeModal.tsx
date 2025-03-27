@@ -33,14 +33,27 @@ type InitiativeModalProps = {
   }) => void;
   goals?: Array<{ id: string; title: string }>;
   buttonLabel?: string;
+  isOpen?: boolean;
+  onClose?: () => void;
 };
 
 export function AddInitiativeModal({ 
   onSave, 
   goals = [], 
-  buttonLabel = "Add Initiative" 
+  buttonLabel = "Add Initiative",
+  isOpen,
+  onClose
 }: InitiativeModalProps) {
-  const [open, setOpen] = useState(false);
+  // If isOpen and onClose are provided, use those, otherwise manage internally
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = isOpen !== undefined ? isOpen : internalOpen;
+  const handleOpenChange = (newOpen: boolean) => {
+    if (onClose && !newOpen) {
+      onClose();
+    }
+    setInternalOpen(newOpen);
+  };
+
   const [initiative, setInitiative] = useState({
     goal_id: undefined as string | undefined,
     title: '',
@@ -66,17 +79,24 @@ export function AddInitiativeModal({
       status: 'active' as InitiativeStatus,
       priority: 3
     });
-    setOpen(false);
+    if (onClose) {
+      onClose();
+    } else {
+      setInternalOpen(false);
+    }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="gap-2">
-          <Plus className="h-4 w-4" />
-          {buttonLabel}
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      {/* Only render the trigger if we're not controlling the open state from outside */}
+      {isOpen === undefined && (
+        <DialogTrigger asChild>
+          <Button className="gap-2">
+            <Plus className="h-4 w-4" />
+            {buttonLabel}
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Add New Initiative</DialogTitle>
@@ -164,7 +184,7 @@ export function AddInitiativeModal({
           </FormItem>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button variant="outline" onClick={() => handleOpenChange(false)}>Cancel</Button>
           <Button onClick={handleSubmit}>Save Initiative</Button>
         </DialogFooter>
       </DialogContent>
