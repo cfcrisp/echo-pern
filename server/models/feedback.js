@@ -107,9 +107,7 @@ class FeedbackModel extends BaseModel {
     const query = `
       DELETE FROM feedback_customers
       WHERE feedback_id = $1
-      RETURNING *
     `;
-    
     const result = await this.pool.query(query, [feedbackId]);
     return result.rowCount > 0;
   }
@@ -315,6 +313,46 @@ class FeedbackModel extends BaseModel {
     // This method is kept for backward compatibility
     // but delegates to the standard create method
     return this.create(feedbackData);
+  }
+
+  /**
+   * Get customers associated with a feedback
+   * @param {String} feedbackId - Feedback ID
+   * @returns {Promise<Array>} Array of customer objects
+   */
+  async getCustomers(feedbackId) {
+    // First get the feedback to find its tenant ID
+    const feedback = await this.findById(feedbackId);
+    if (!feedback) return [];
+    
+    const query = `
+      SELECT c.*
+      FROM customers c
+      JOIN feedback_customers fc ON c.id = fc.customer_id
+      WHERE fc.feedback_id = $1 AND c.tenant_id = $2
+    `;
+    const result = await this.pool.query(query, [feedbackId, feedback.tenant_id]);
+    return result.rows;
+  }
+
+  /**
+   * Get initiatives associated with a feedback
+   * @param {String} feedbackId - Feedback ID
+   * @returns {Promise<Array>} Array of initiative objects
+   */
+  async getInitiatives(feedbackId) {
+    // First get the feedback to find its tenant ID
+    const feedback = await this.findById(feedbackId);
+    if (!feedback) return [];
+    
+    const query = `
+      SELECT i.*
+      FROM initiatives i
+      JOIN feedback_initiatives fi ON i.id = fi.initiative_id
+      WHERE fi.feedback_id = $1 AND i.tenant_id = $2
+    `;
+    const result = await this.pool.query(query, [feedbackId, feedback.tenant_id]);
+    return result.rows;
   }
 }
 

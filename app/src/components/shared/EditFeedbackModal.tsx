@@ -91,12 +91,19 @@ export function EditFeedbackModal({
   };
 
   const handleSubmit = () => {
+    console.log('Form data before submission:', formData);
+    console.log('Original customerId:', formData.customerId);
+    
     // Convert "none" values back to undefined before submission
     const submittedData = {
       ...formData,
       initiativeId: formData.initiativeId === 'none' ? undefined : formData.initiativeId,
       customerId: formData.customerId === 'none' ? undefined : formData.customerId
     };
+    
+    console.log('Submitted data after processing:', submittedData);
+    console.log('Final customerId value:', submittedData.customerId);
+    
     onUpdate(feedback.id, submittedData);
     setOpen(false);
   };
@@ -169,7 +176,7 @@ export function EditFeedbackModal({
               <SelectContent>
                 <SelectItem value="none">None - General feedback (not customer-specific)</SelectItem>
                 {customers.map(customer => (
-                  <SelectItem key={customer.id} value={customer.id}>{customer.name} (Customer #{customer.id})</SelectItem>
+                  <SelectItem key={customer.id} value={customer.id}>{customer.name} (Customer #{customer.id.substring(0, 8)})</SelectItem>
                 ))}
               </SelectContent>
             </Select>

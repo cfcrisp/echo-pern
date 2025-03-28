@@ -267,28 +267,96 @@ const Ideas = () => {
     initiative_id?: string;
   }) => {
     try {
+      console.log('handleUpdateIdea called with:', id, updatedData);
+
+      // Find the existing idea first to ensure we have all required data
+      const existingIdea = ideas.find(i => i.id === id);
+      if (!existingIdea) {
+        console.error('Cannot update idea: idea not found');
+        return;
+      }
+      console.log('Found existing idea:', existingIdea);
+
+      // Update local state immediately with optimistic update
+      setIdeas(prevIdeas => prevIdeas.map(idea => {
+        if (idea.id === id) {
+          // Find related entities for displaying in the UI
+          const customerName = updatedData.customer_id 
+            ? customers.find(c => c.id === updatedData.customer_id)?.name || 'Unknown' 
+            : undefined;
+            
+          const initiativeName = updatedData.initiative_id
+            ? initiatives.find(i => i.id === updatedData.initiative_id)?.title
+            : undefined;
+          
+          // Preserve all existing idea properties while updating only changed fields
+          return { 
+            ...idea, 
+            title: updatedData.title,
+            description: updatedData.description,
+            priority: updatedData.priority,
+            effort: updatedData.effort,
+            status: updatedData.status,
+            customer_id: updatedData.customer_id,
+            initiative_id: updatedData.initiative_id,
+            customer_name: customerName,
+            initiative_name: initiativeName
+          };
+        }
+        return idea;
+      }));
+      
+      // Show loading state
+      setLoading(true);
+      
+      console.log('Making API call to update idea with:', updatedData);
+      
+      // Update the idea in the API
       await apiClient.ideas.update(id, updatedData);
       
-      // Update the local state with the updated idea
+      // Fetch the complete updated idea to ensure we have the latest data
+      const refreshedIdea = await apiClient.ideas.getById(id);
+      
+      // Find related entities for displaying in the UI
+      const customerName = refreshedIdea.customer_id 
+        ? customers.find(c => c.id === refreshedIdea.customer_id)?.name || 'Unknown' 
+        : undefined;
+        
+      const initiativeName = refreshedIdea.initiative_id
+        ? initiatives.find(i => i.id === refreshedIdea.initiative_id)?.title
+        : undefined;
+      
+      // Create a complete idea object with all UI-necessary data
+      const completeIdea = {
+        ...refreshedIdea,
+        customer_name: customerName,
+        initiative_name: initiativeName,
+        // Ensure we preserve any UI-specific properties not returned by the API
+        createdAt: refreshedIdea.createdAt || refreshedIdea.created_at,
+        // Make sure we keep other properties the UI expects
+        votes: refreshedIdea.votes !== undefined ? refreshedIdea.votes : 0
+      };
+      
+      console.log('Idea updated successfully, refreshed data:', completeIdea);
+      
+      // Update the local state with the full refreshed idea
       setIdeas(prevIdeas => prevIdeas.map(idea => 
-        idea.id === id 
-          ? { 
-              ...idea, 
-              title: updatedData.title,
-              description: updatedData.description,
-              priority: updatedData.priority,
-              status: updatedData.status,
-              customer_id: updatedData.customer_id,
-              customer_name: updatedData.customer_id 
-                ? customers.find(c => c.id === updatedData.customer_id)?.name || idea.customer_name 
-                : undefined
-            } 
-          : idea
+        idea.id === id ? completeIdea : idea
       ));
       
     } catch (err) {
       console.error('Error updating idea:', err);
       alert('Failed to update the idea. Please try again.');
+      
+      // If API update fails, revert to original state by re-fetching
+      try {
+        const ideas = await apiClient.ideas.getAll();
+        setIdeas(ideas);
+      } catch (refreshErr) {
+        console.error('Error refreshing ideas after failed update:', refreshErr);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 

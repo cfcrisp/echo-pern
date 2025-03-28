@@ -22,6 +22,10 @@ const processFeedbackComments = async (feedback) => {
     // Get associated initiatives
     const initiatives = await feedbackModel.getInitiatives(feedback.id);
     
+    console.log('DEBUG: processFeedbackComments for feedback ID:', feedback.id);
+    console.log('DEBUG: Found customers:', customers.length);
+    console.log('DEBUG: Found initiatives:', initiatives.length);
+    
     // Get comments
     const comments = await commentModel.findByEntity('feedback', feedback.id);
     
@@ -33,6 +37,7 @@ const processFeedbackComments = async (feedback) => {
     };
   } catch (error) {
     console.error('Error processing feedback comments:', error);
+    // Return the feedback without the extra data
     return feedback;
   }
 };
@@ -229,15 +234,21 @@ router.put('/:id', authenticate, authorizeFeedbackAccess, async (req, res) => {
     // Handle initiative associations if provided
     if (initiative_id || (initiative_ids && Array.isArray(initiative_ids))) {
       try {
+        console.log('DEBUG: Processing initiative associations');
+        console.log('DEBUG: initiative_id:', initiative_id);
+        console.log('DEBUG: initiative_ids:', initiative_ids);
+        
         // Remove existing initiative associations
         await feedbackModel.removeAllInitiatives(id);
         
         // Add new initiative associations
         if (initiative_id) {
+          console.log('DEBUG: Adding single initiative with ID:', initiative_id);
           await feedbackModel.addInitiative(id, initiative_id);
         }
         
         if (initiative_ids && Array.isArray(initiative_ids)) {
+          console.log('DEBUG: Adding multiple initiatives:', initiative_ids);
           for (const iId of initiative_ids) {
             await feedbackModel.addInitiative(id, iId);
           }
@@ -246,6 +257,8 @@ router.put('/:id', authenticate, authorizeFeedbackAccess, async (req, res) => {
         console.error('Error updating initiative associations:', error);
         // Continue processing even if this part fails
       }
+    } else {
+      console.log('DEBUG: No initiative data provided in update');
     }
     
     // Return updated feedback with full details

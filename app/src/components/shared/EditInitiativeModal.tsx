@@ -156,6 +156,8 @@ export function EditInitiativeModal({ initiative, goals, onUpdate, triggerButton
                 <SelectItem value="1">High (1) - Critical for business success</SelectItem>
                 <SelectItem value="2">Medium (2) - Important but not urgent</SelectItem>
                 <SelectItem value="3">Low (3) - Desirable improvement</SelectItem>
+                <SelectItem value="4">Very Low (4) - Minor enhancement</SelectItem>
+                <SelectItem value="5">Minimal (5) - Nice to have</SelectItem>
               </SelectContent>
             </Select>
           </FormItem>

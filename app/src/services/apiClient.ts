@@ -668,6 +668,8 @@ export const feedbackApi = {
     content?: string;
     sentiment?: 'positive' | 'neutral' | 'negative';
     source?: string;
+    customer_id?: string;
+    initiative_id?: string;
   }) => {
     try {
       return await fetchWithAuth(`/feedback/${id}`, {

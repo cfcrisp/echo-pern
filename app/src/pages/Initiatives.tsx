@@ -3,7 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ChevronRight, Target, List, Plus, Clock, CalendarClock, ArrowUpFromLine, BarChart3, ArrowLeft } from 'lucide-react';
+import { ChevronRight, Target, List, Plus, Clock, CalendarClock, ArrowUpFromLine, BarChart3, ArrowLeft, Lightbulb, MessageSquare, MoreHorizontal, Trash2, ChevronDown } from 'lucide-react';
 import { AddInitiativeModal, EditInitiativeModal } from "@/components/shared";
 import apiClient from '@/services/apiClient';
 import { useAuth } from '@/context/AuthContext';
@@ -23,6 +23,8 @@ type Initiative = {
     id: string;
     title: string;
   };
+  ideas_count?: number;
+  feedback_count?: number;
 };
 
 const Initiatives = () => {
@@ -34,6 +36,9 @@ const Initiatives = () => {
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
   const [goals, setGoals] = useState<Array<{ id: string; title: string }>>([]);
+  const [expandedInitiatives, setExpandedInitiatives] = useState<Record<string, boolean>>({});
+  const [showMenu, setShowMenu] = useState<Record<string, boolean>>({});
+  const [expandedSections, setExpandedSections] = useState<Record<string, Record<string, boolean>>>({});
   
   // Get initiative ID from URL if available
   const { id: initiativeId } = useParams<{ id: string }>();
@@ -57,10 +62,36 @@ const Initiatives = () => {
           try {
             const initiativeData = await apiClient.initiatives.getById(initiativeId);
             
+            // Fetch goals in parallel for dropdown
+            const goalsData = await apiClient.goals.getAll();
+            const formattedGoals = (goalsData && !('error' in goalsData)) 
+              ? goalsData.map((goal: { id: string; title: string }) => ({
+                id: goal.id,
+                title: goal.title
+              }))
+              : [];
+            
+            setGoals(formattedGoals);
+            
             // Check if we got valid data
             if (initiativeData && !('error' in initiativeData)) {
-              setCurrentInitiative(initiativeData);
-              setInitiatives([initiativeData]); // Still set this for consistency
+              // Enrich initiative with goal data if it has a goal_id
+              let enrichedInitiative = initiativeData;
+              if (initiativeData.goal_id) {
+                const matchingGoal = formattedGoals.find((g: {id: string; title: string}) => g.id === initiativeData.goal_id);
+                if (matchingGoal) {
+                  enrichedInitiative = {
+                    ...initiativeData,
+                    goal: {
+                      id: matchingGoal.id,
+                      title: matchingGoal.title
+                    }
+                  };
+                }
+              }
+              
+              setCurrentInitiative(enrichedInitiative);
+              setInitiatives([enrichedInitiative]); // Still set this for consistency
             } else {
               // Handle error
               setError('Initiative not found or could not be loaded');
@@ -70,15 +101,6 @@ const Initiatives = () => {
             console.error('Error fetching initiative:', err);
             setError('Failed to load initiative details');
             setCurrentInitiative(null);
-          }
-          
-          // Fetch goals in parallel for dropdown
-          const goalsData = await apiClient.goals.getAll();
-          if (goalsData && !('error' in goalsData)) {
-            setGoals(goalsData.map((goal: { id: string; title: string }) => ({
-              id: goal.id,
-              title: goal.title
-            })));
           }
         } else {
           // Fetch all initiatives and goals (original behavior)
@@ -99,17 +121,36 @@ const Initiatives = () => {
             setError(`Error: ${initiativesData.error}`);
             setInitiatives([]);
           } else {
-            setInitiatives(initiativesData || []);
-          }
-          
-          // Format goals data for the dropdown
-          if (goalsData && !('error' in goalsData)) {
-            setGoals(goalsData.map((goal: { id: string; title: string }) => ({
-              id: goal.id,
-              title: goal.title
-            })));
-          } else {
-            setGoals([]);
+            // Format goals data for the dropdown
+            if (goalsData && !('error' in goalsData)) {
+              const formattedGoals = goalsData.map((goal: { id: string; title: string }) => ({
+                id: goal.id,
+                title: goal.title
+              }));
+              setGoals(formattedGoals);
+              
+              // Enrich initiatives with goal data
+              const enrichedInitiatives = (initiativesData || []).map((initiative: Initiative) => {
+                if (initiative.goal_id) {
+                  const matchingGoal = formattedGoals.find((g: {id: string; title: string}) => g.id === initiative.goal_id);
+                  if (matchingGoal) {
+                    return {
+                      ...initiative,
+                      goal: {
+                        id: matchingGoal.id,
+                        title: matchingGoal.title
+                      }
+                    };
+                  }
+                }
+                return initiative;
+              });
+              
+              setInitiatives(enrichedInitiatives);
+            } else {
+              setGoals([]);
+              setInitiatives(initiativesData || []);
+            }
           }
         }
         
@@ -190,70 +231,104 @@ const Initiatives = () => {
       };
       
       // Update via API
-      await apiClient.initiatives.update(id, apiData);
+      const updatedInitiative = await apiClient.initiatives.update(id, apiData);
       
-      // Update the local state
-      setInitiatives(prev => prev.map(initiative => {
-        if (initiative.id === id) {
-          // Find the matching goal if there is one
-          let goalInfo = undefined;
-          if (updatedData.goalId) {
-            const matchingGoal = goals.find(g => g.id === updatedData.goalId);
-            if (matchingGoal) {
-              goalInfo = {
-                id: matchingGoal.id,
-                title: matchingGoal.title
-              };
-            }
-          }
-          
-          return {
-            ...initiative,
-            title: updatedData.title,
-            description: updatedData.description,
-            status: updatedData.status,
-            priority: updatedData.priority,
-            goal_id: updatedData.goalId,
-            goal: goalInfo
+      // Fetch the updated initiative with all its relationships to ensure accurate data
+      const refreshedInitiative = await apiClient.initiatives.getById(id);
+      
+      // Find the matching goal if there is one
+      let goalInfo = undefined;
+      if (refreshedInitiative.goal_id) {
+        const matchingGoal = goals.find(g => g.id === refreshedInitiative.goal_id);
+        if (matchingGoal) {
+          goalInfo = {
+            id: matchingGoal.id,
+            title: matchingGoal.title
           };
         }
-        return initiative;
-      }));
+      }
+      
+      // Create a complete initiative object with all data
+      const completeInitiative = {
+        ...refreshedInitiative,
+        goal: goalInfo
+      };
+      
+      // Update the local state
+      setInitiatives(prev => prev.map(initiative => 
+        initiative.id === id ? completeInitiative : initiative
+      ));
       
       // If we're in single view, update the current initiative
       if (currentInitiative && currentInitiative.id === id) {
-        setCurrentInitiative(prev => {
-          if (!prev) return null;
-          
-          let goalInfo = prev.goal;
-          if (updatedData.goalId !== prev.goal_id) {
-            if (updatedData.goalId) {
-              const matchingGoal = goals.find(g => g.id === updatedData.goalId);
-              if (matchingGoal) {
-                goalInfo = {
-                  id: matchingGoal.id,
-                  title: matchingGoal.title
-                };
-              }
-            } else {
-              goalInfo = undefined;
-            }
-          }
-          
-          return {
-            ...prev,
-            title: updatedData.title,
-            description: updatedData.description,
-            status: updatedData.status,
-            priority: updatedData.priority,
-            goal_id: updatedData.goalId,
-            goal: goalInfo
-          };
-        });
+        setCurrentInitiative(completeInitiative);
       }
     } catch (err) {
       console.error('Error updating initiative:', err);
       alert('Failed to update initiative. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Toggle expanded state for an initiative
+  const toggleExpanded = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedInitiatives(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
+  
+  // Toggle menu visibility
+  const toggleMenu = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowMenu(prev => {
+      // Close all other menus
+      const newState: Record<string, boolean> = {};
+      Object.keys(prev).forEach(key => {
+        newState[key] = key === id ? !prev[key] : false;
+      });
+      return newState;
+    });
+  };
+  
+  // Toggle section expanded state (goals, ideas, feedback)
+  const toggleSection = (initiativeId: string, section: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedSections(prev => {
+      const initiativeSections = prev[initiativeId] || {};
+      return {
+        ...prev,
+        [initiativeId]: {
+          ...initiativeSections,
+          [section]: !initiativeSections[section]
+        }
+      };
+    });
+  };
+  
+  // Handle deleting an initiative
+  const handleDeleteInitiative = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this initiative? This action cannot be undone.')) {
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      // Delete the initiative via API
+      await apiClient.initiatives.delete(id);
+      
+      // Update the local state
+      setInitiatives(prevInitiatives => prevInitiatives.filter(initiative => initiative.id !== id));
+      
+      // If in single view and we deleted the current initiative, navigate back to list
+      if (isSingleView && currentInitiative?.id === id) {
+        navigate('/initiatives');
+      }
+    } catch (err) {
+      console.error('Error deleting initiative:', err);
+      alert('Failed to delete the initiative. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -270,13 +345,14 @@ const Initiatives = () => {
     ? filteredInitiatives 
     : filteredInitiatives.filter(initiative => initiative.status === activeTab);
 
-  const priorityLabels = ['Low', 'Medium', 'High', 'Critical'];
+  const priorityLabels = ['High', 'Medium', 'Low', 'Very Low', 'Minimal'];
   const getPriorityColor = (priority: number) => {
     switch (priority) {
-      case 1: return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
-      case 2: return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
-      case 3: return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400';
-      case 4: return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+      case 1: return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+      case 2: return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400';
+      case 3: return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
+      case 4: return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
+      case 5: return 'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400';
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400';
     }
   };
@@ -326,21 +402,28 @@ const Initiatives = () => {
             </span>
           </div>
           
-          {currentInitiative.goal && (
-            <div className="flex items-center text-sm text-primary mb-4 bg-primary/5 p-3 rounded-md border border-primary/10">
-              <Target className="h-5 w-5 mr-2" />
-              <div>
-                <span className="font-medium">Linked Goal:</span> {currentInitiative.goal.title}
-                <Button 
-                  variant="link" 
-                  className="h-6 pl-1 text-primary"
-                  onClick={() => navigate(`/goals?highlight=${currentInitiative.goal_id}`)}
-                >
-                  View Goal
-                </Button>
-              </div>
+          {/* Goal information - always shown */}
+          <div className="flex items-center text-sm mb-4 bg-gray-50 dark:bg-gray-800/30 p-3 rounded-md border border-gray-200 dark:border-gray-700">
+            <Target 
+              className={`h-5 w-5 mr-2 ${currentInitiative.goal ? "text-primary" : "text-gray-400"}`}
+            />
+            <div>
+              {currentInitiative.goal ? (
+                <>
+                  <span className="font-medium">Linked Goal:</span> {currentInitiative.goal.title}
+                  <Button 
+                    variant="link" 
+                    className="h-6 pl-1 text-primary"
+                    onClick={() => navigate(`/goals?highlight=${currentInitiative.goal_id}`)}
+                  >
+                    View Goal
+                  </Button>
+                </>
+              ) : (
+                <span className="text-gray-500">No goal linked to this initiative</span>
+              )}
             </div>
-          )}
+          </div>
           
           <div className="mt-4">
             <h3 className="text-sm font-medium text-gray-500 mb-2">Description</h3>
@@ -473,11 +556,16 @@ const Initiatives = () => {
                 <div className="space-y-4">
                   {displayedInitiatives.map((initiative) => (
                     <Card key={initiative.id} 
-                      className="p-5 hover:shadow-md transition-shadow cursor-pointer" 
-                      onClick={() => navigate(`/initiatives/${initiative.id}`)}
+                      className={`p-5 hover:shadow-md transition-shadow ${expandedInitiatives[initiative.id] ? 'border-primary/50' : ''}`}
+                      onClick={() => {
+                        setExpandedInitiatives(prev => ({
+                          ...prev,
+                          [initiative.id]: !prev[initiative.id]
+                        }));
+                      }}
                     >
                       <div className="flex justify-between">
-                        <div>
+                        <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
                             <h3 className="text-lg font-semibold">{initiative.title}</h3>
                             <span className={`px-2 py-0.5 text-xs rounded-full ${getStatusColor(initiative.status)}`}>
@@ -487,27 +575,179 @@ const Initiatives = () => {
                               {priorityLabels[initiative.priority - 1] || 'Unknown'} Priority
                             </span>
                           </div>
-                          <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">{initiative.description}</p>
                           
-                          {initiative.goal && (
-                            <div className="flex items-center text-sm text-primary mb-2">
-                              <Target className="h-4 w-4 mr-1.5" />
-                              <span>Goal: {initiative.goal.title}</span>
+                          {/* Description - only shown when expanded */}
+                          {expandedInitiatives[initiative.id] && (
+                            <p className="text-sm text-gray-600 dark:text-gray-300 mb-3 mt-2 pl-2 border-l-2 border-primary/30">
+                              {initiative.description || "No description provided."}
+                            </p>
+                          )}
+                          
+                          <div className="flex items-center gap-4 text-sm">
+                            {/* Linked Goal - Always show (without dropdown) */}
+                            <div className="flex items-center text-sm">
+                              <Target 
+                                className={`h-4 w-4 mr-1.5 ${initiative.goal ? "text-primary" : "text-gray-400"}`}
+                              />
+                              <span className={initiative.goal ? "text-primary" : "text-gray-500"}>
+                                {initiative.goal ? (
+                                  <Link 
+                                    to={`/goals?highlight=${initiative.goal_id}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                    }}
+                                    className="hover:underline"
+                                  >
+                                    Goal: {initiative.goal.title}
+                                  </Link>
+                                ) : (
+                                  "No linked goal"
+                                )}
+                              </span>
+                            </div>
+                            
+                            {/* Ideas Count - Always show */}
+                            <div className="flex items-center text-xs text-slate-600 dark:text-gray-400">
+                              <Lightbulb className="h-3.5 w-3.5 mr-1" />
+                              <span>{initiative.ideas_count || 0} ideas</span>
+                              {(initiative.ideas_count && initiative.ideas_count > 0) && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-6 w-6 p-0 ml-1"
+                                  onClick={(e) => toggleSection(initiative.id, 'ideas', e)}
+                                >
+                                  <ChevronDown className={`h-3 w-3 transition-transform ${
+                                    expandedSections[initiative.id]?.ideas ? 'rotate-180' : ''
+                                  }`} />
+                                </Button>
+                              )}
+                            </div>
+                            
+                            {/* Feedback Count - Always show */}
+                            <div className="flex items-center text-xs text-slate-600 dark:text-gray-400">
+                              <MessageSquare className="h-3.5 w-3.5 mr-1" />
+                              <span>{initiative.feedback_count || 0} feedback</span>
+                              {(initiative.feedback_count && initiative.feedback_count > 0) && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-6 w-6 p-0 ml-1"
+                                  onClick={(e) => toggleSection(initiative.id, 'feedback', e)}
+                                >
+                                  <ChevronDown className={`h-3 w-3 transition-transform ${
+                                    expandedSections[initiative.id]?.feedback ? 'rotate-180' : ''
+                                  }`} />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {/* Related Ideas and Feedback - shown when expanded */}
+                          {expandedInitiatives[initiative.id] && (
+                            <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
+                              {/* Goal Details Section removed - now directly linked in the header */}
+                              
+                              {/* Ideas Section */}
+                              {(initiative.ideas_count && initiative.ideas_count > 0 && expandedSections[initiative.id]?.ideas) ? (
+                                <div className="mb-3">
+                                  <div className="flex items-center mb-2 text-xs font-medium text-slate-500">
+                                    <Lightbulb className="h-3.5 w-3.5 mr-1.5 text-yellow-500" />
+                                    <span>Related Ideas</span>
+                                  </div>
+                                  <div className="pl-2 border-l-2 border-yellow-200 dark:border-yellow-900/50">
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      className="h-7 text-xs"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigate(`/ideas?initiative=${initiative.id}`);
+                                      }}
+                                    >
+                                      View {initiative.ideas_count} related ideas
+                                      <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : null}
+                              
+                              {/* Feedback Section */}
+                              {(initiative.feedback_count && initiative.feedback_count > 0 && expandedSections[initiative.id]?.feedback) ? (
+                                <div>
+                                  <div className="flex items-center mb-2 text-xs font-medium text-slate-500">
+                                    <MessageSquare className="h-3.5 w-3.5 mr-1.5 text-blue-500" />
+                                    <span>Related Feedback</span>
+                                  </div>
+                                  <div className="pl-2 border-l-2 border-blue-200 dark:border-blue-900/50">
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      className="h-7 text-xs"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigate(`/feedback?initiative=${initiative.id}`);
+                                      }}
+                                    >
+                                      View {initiative.feedback_count} related feedback
+                                      <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : null}
                             </div>
                           )}
                         </div>
                         
-                        <div className="flex gap-2">
+                        <div className="flex flex-col items-end gap-2">
+                          <div className="flex items-center space-x-2">
+                            <EditInitiativeModal 
+                              initiative={{
+                                id: initiative.id,
+                                title: initiative.title,
+                                description: initiative.description,
+                                status: initiative.status,
+                                priority: initiative.priority,
+                                goalId: initiative.goal_id
+                              }}
+                              goals={goals}
+                              onUpdate={handleUpdateInitiative}
+                              triggerButtonSize="icon"
+                            />
+                            <div className="relative">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-8 w-8 p-0"
+                                onClick={(e) => toggleMenu(initiative.id, e)}
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                              
+                              {showMenu[initiative.id] && (
+                                <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded shadow-lg z-10 dark:bg-card dark:border-border">
+                                  <div 
+                                    className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center text-red-600 dark:hover:bg-gray-800/50"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteInitiative(initiative.id);
+                                      toggleMenu(initiative.id, e);
+                                    }}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          
                           <Button 
-                            variant="outline" 
+                            variant="ghost" 
                             size="sm" 
-                            className="h-8"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`/initiatives/${initiative.id}`);
-                            }}
+                            className="h-7 w-7 p-0 rounded-full"
+                            onClick={(e) => toggleExpanded(initiative.id, e)}
                           >
-                            <BarChart3 className="h-3.5 w-3.5 mr-1.5" /> Details
+                            <ChevronDown className={`h-4 w-4 transition-transform ${expandedInitiatives[initiative.id] ? 'rotate-180' : ''}`} />
                           </Button>
                         </div>
                       </div>
@@ -540,11 +780,16 @@ const Initiatives = () => {
                   <div className="space-y-4">
                     {displayedInitiatives.map((initiative) => (
                       <Card key={initiative.id} 
-                        className="p-5 hover:shadow-md transition-shadow cursor-pointer"
-                        onClick={() => navigate(`/initiatives/${initiative.id}`)}
+                        className={`p-5 hover:shadow-md transition-shadow ${expandedInitiatives[initiative.id] ? 'border-primary/50' : ''}`}
+                        onClick={() => {
+                          setExpandedInitiatives(prev => ({
+                            ...prev,
+                            [initiative.id]: !prev[initiative.id]
+                          }));
+                        }}
                       >
                         <div className="flex justify-between">
-                          <div>
+                          <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
                               <h3 className="text-lg font-semibold">{initiative.title}</h3>
                               <span className={`px-2 py-0.5 text-xs rounded-full ${getStatusColor(initiative.status)}`}>
@@ -554,27 +799,179 @@ const Initiatives = () => {
                                 {priorityLabels[initiative.priority - 1] || 'Unknown'} Priority
                               </span>
                             </div>
-                            <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">{initiative.description}</p>
                             
-                            {initiative.goal && (
-                              <div className="flex items-center text-sm text-primary mb-2">
-                                <Target className="h-4 w-4 mr-1.5" />
-                                <span>Goal: {initiative.goal.title}</span>
+                            {/* Description - only shown when expanded */}
+                            {expandedInitiatives[initiative.id] && (
+                              <p className="text-sm text-gray-600 dark:text-gray-300 mb-3 mt-2 pl-2 border-l-2 border-primary/30">
+                                {initiative.description || "No description provided."}
+                              </p>
+                            )}
+                            
+                            <div className="flex items-center gap-4 text-sm">
+                              {/* Linked Goal - Always show (without dropdown) */}
+                              <div className="flex items-center text-sm">
+                                <Target 
+                                  className={`h-4 w-4 mr-1.5 ${initiative.goal ? "text-primary" : "text-gray-400"}`}
+                                />
+                                <span className={initiative.goal ? "text-primary" : "text-gray-500"}>
+                                  {initiative.goal ? (
+                                    <Link 
+                                      to={`/goals?highlight=${initiative.goal_id}`}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                      }}
+                                      className="hover:underline"
+                                    >
+                                      Goal: {initiative.goal.title}
+                                    </Link>
+                                  ) : (
+                                    "No linked goal"
+                                  )}
+                                </span>
+                              </div>
+                              
+                              {/* Ideas Count - Always show */}
+                              <div className="flex items-center text-xs text-slate-600 dark:text-gray-400">
+                                <Lightbulb className="h-3.5 w-3.5 mr-1" />
+                                <span>{initiative.ideas_count || 0} ideas</span>
+                                {(initiative.ideas_count && initiative.ideas_count > 0) && (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-6 w-6 p-0 ml-1"
+                                    onClick={(e) => toggleSection(initiative.id, 'ideas', e)}
+                                  >
+                                    <ChevronDown className={`h-3 w-3 transition-transform ${
+                                      expandedSections[initiative.id]?.ideas ? 'rotate-180' : ''
+                                    }`} />
+                                  </Button>
+                                )}
+                              </div>
+                              
+                              {/* Feedback Count - Always show */}
+                              <div className="flex items-center text-xs text-slate-600 dark:text-gray-400">
+                                <MessageSquare className="h-3.5 w-3.5 mr-1" />
+                                <span>{initiative.feedback_count || 0} feedback</span>
+                                {(initiative.feedback_count && initiative.feedback_count > 0) && (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-6 w-6 p-0 ml-1"
+                                    onClick={(e) => toggleSection(initiative.id, 'feedback', e)}
+                                  >
+                                    <ChevronDown className={`h-3 w-3 transition-transform ${
+                                      expandedSections[initiative.id]?.feedback ? 'rotate-180' : ''
+                                    }`} />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {/* Related Ideas and Feedback - shown when expanded */}
+                            {expandedInitiatives[initiative.id] && (
+                              <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
+                                {/* Goal Details Section removed - now directly linked in the header */}
+                                
+                                {/* Ideas Section */}
+                                {(initiative.ideas_count && initiative.ideas_count > 0 && expandedSections[initiative.id]?.ideas) ? (
+                                  <div className="mb-3">
+                                    <div className="flex items-center mb-2 text-xs font-medium text-slate-500">
+                                      <Lightbulb className="h-3.5 w-3.5 mr-1.5 text-yellow-500" />
+                                      <span>Related Ideas</span>
+                                    </div>
+                                    <div className="pl-2 border-l-2 border-yellow-200 dark:border-yellow-900/50">
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-7 text-xs"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          navigate(`/ideas?initiative=${initiative.id}`);
+                                        }}
+                                      >
+                                        View {initiative.ideas_count} related ideas
+                                        <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : null}
+                                
+                                {/* Feedback Section */}
+                                {(initiative.feedback_count && initiative.feedback_count > 0 && expandedSections[initiative.id]?.feedback) ? (
+                                  <div>
+                                    <div className="flex items-center mb-2 text-xs font-medium text-slate-500">
+                                      <MessageSquare className="h-3.5 w-3.5 mr-1.5 text-blue-500" />
+                                      <span>Related Feedback</span>
+                                    </div>
+                                    <div className="pl-2 border-l-2 border-blue-200 dark:border-blue-900/50">
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-7 text-xs"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          navigate(`/feedback?initiative=${initiative.id}`);
+                                        }}
+                                      >
+                                        View {initiative.feedback_count} related feedback
+                                        <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : null}
                               </div>
                             )}
                           </div>
                           
-                          <div className="flex gap-2">
+                          <div className="flex flex-col items-end gap-2">
+                            <div className="flex items-center space-x-2">
+                              <EditInitiativeModal 
+                                initiative={{
+                                  id: initiative.id,
+                                  title: initiative.title,
+                                  description: initiative.description,
+                                  status: initiative.status,
+                                  priority: initiative.priority,
+                                  goalId: initiative.goal_id
+                                }}
+                                goals={goals}
+                                onUpdate={handleUpdateInitiative}
+                                triggerButtonSize="icon"
+                              />
+                              <div className="relative">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-8 w-8 p-0"
+                                  onClick={(e) => toggleMenu(initiative.id, e)}
+                                >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                                
+                                {showMenu[initiative.id] && (
+                                  <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded shadow-lg z-10 dark:bg-card dark:border-border">
+                                    <div 
+                                      className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center text-red-600 dark:hover:bg-gray-800/50"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteInitiative(initiative.id);
+                                        toggleMenu(initiative.id, e);
+                                      }}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            
                             <Button 
-                              variant="outline" 
+                              variant="ghost" 
                               size="sm" 
-                              className="h-8"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(`/initiatives/${initiative.id}`);
-                              }}
+                              className="h-7 w-7 p-0 rounded-full"
+                              onClick={(e) => toggleExpanded(initiative.id, e)}
                             >
-                              <BarChart3 className="h-3.5 w-3.5 mr-1.5" /> Details
+                              <ChevronDown className={`h-4 w-4 transition-transform ${expandedInitiatives[initiative.id] ? 'rotate-180' : ''}`} />
                             </Button>
                           </div>
                         </div>
