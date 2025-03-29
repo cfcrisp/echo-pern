@@ -199,15 +199,11 @@ const postprocessIdea = async (idea, req) => {
  */
 router.post('/', authenticate, createEntityHandler(
   ideaModel,
-  ['title'], // Only require title, the rest will have defaults
-  async (data, req) => {
-    // Preprocess the data
-    const processed = await preprocessIdea(data, req);
-    
-    // We'll return the processed data for creation
-    return processed;
-  },
-  postprocessIdea // Add postprocessing for customer associations
+  'ideas',
+  {
+    preprocessor: preprocessIdea,
+    postprocessor: postprocessIdea
+  }
 ));
 
 /**

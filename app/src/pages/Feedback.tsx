@@ -34,7 +34,8 @@ type Feedback = {
   createdAt: string;
   initiative_id?: string;
   initiative_name?: string;
-  expanded?: boolean; // Add this property to track expanded state
+  expanded?: boolean;
+  initiatives?: Array<{ id: string; title: string }>;
 };
 
 // Feedback Component
@@ -57,6 +58,65 @@ const Feedback = () => {
     sentiment: 'all',
     customer: 'all'
   });
+  
+  // Helper function to extract initiative data from various API response formats
+  const extractInitiativeData = (item: any) => {
+    // Initialize with default values
+    let initiativeId = item.initiative_id;
+    let initiativeName;
+    
+    // Check for initiatives array from server
+    if (!initiativeId && item.initiatives && item.initiatives.length > 0) {
+      initiativeId = item.initiatives[0].id;
+      initiativeName = item.initiatives[0].title;
+    } else if (initiativeId) {
+      // Find initiative name if we have the ID
+      initiativeName = initiatives.find(i => i.id === initiativeId)?.title;
+    }
+    
+    return { initiativeId, initiativeName };
+  };
+  
+  // Helper function to extract customer data
+  const extractCustomerData = (item: any) => {
+    // Get customer ID from the item
+    const customerId = item?.customer_id || null;
+    
+    // If we have a customer ID, look up the name
+    let customerName = item?.customer_name || null;
+    
+    if (customerId && customers.length > 0 && (!customerName || customerName === 'Unknown')) {
+      // Find the customer in our local state
+      const customer = customers.find(c => c.id === customerId);
+      if (customer?.name) {
+        customerName = customer.name;
+      }
+    }
+    
+    return { 
+      customerId, 
+      customerName: customerName || 'Unknown' 
+    };
+  };
+  
+  // Helper function to format feedback data consistently
+  const formatFeedbackData = (item: any): Feedback => {
+    const { initiativeId, initiativeName } = extractInitiativeData(item);
+    const { customerId, customerName } = extractCustomerData(item);
+    
+    return {
+      id: item.id,
+      title: item.title,
+      description: item.description || '',
+      sentiment: item.sentiment || 'neutral',
+      customer_name: customerName,
+      customer_id: customerId,
+      createdAt: item.created_at || item.createdAt || 'Recently',
+      initiative_id: initiativeId,
+      initiative_name: initiativeName,
+      initiatives: item.initiatives
+    };
+  };
   
   // Fetch customers and initiatives when the component mounts
   useEffect(() => {
@@ -91,7 +151,7 @@ const Feedback = () => {
     fetchRelatedData();
   }, []);
   
-  // Fetch feedback data when component mounts
+  // Fetch feedback data when component mounts and initiatives load
   useEffect(() => {
     const fetchFeedback = async () => {
       try {
@@ -101,25 +161,10 @@ const Feedback = () => {
         setLoading(true);
         const data = await apiClient.feedback.getAll();
         
-        // Format the data to match our Feedback type if needed
-        const formattedData = Array.isArray(data) ? data.map((item: any) => {
-          // Find initiative name if available
-          const initiativeName = item.initiative_id
-            ? initiatives.find(i => i.id === item.initiative_id)?.title
-            : undefined;
-            
-          return {
-            id: item.id,
-            title: item.title,
-            description: item.description || '',
-            sentiment: item.sentiment || 'neutral',
-            customer_name: item.customer_name || 'Unknown',
-            customer_id: item.customer_id,
-            createdAt: item.created_at || 'Recently',
-            initiative_id: item.initiative_id,
-            initiative_name: initiativeName
-          };
-        }) : [];
+        // Format the data consistently using our helper
+        const formattedData = Array.isArray(data) 
+          ? data.map(formatFeedbackData) 
+          : [];
         
         setFeedback(formattedData);
         setError(null);
@@ -144,7 +189,6 @@ const Feedback = () => {
   // Toggle menu visibility
   const toggleMenu = (id: string) => {
     setShowMenu(prev => {
-      // Close all other menus
       const newState: Record<string, boolean> = {};
       Object.keys(prev).forEach(key => {
         newState[key] = key === id ? !prev[key] : false;
@@ -193,43 +237,90 @@ const Feedback = () => {
     sentiment: FeedbackSentiment;
     customer_id?: string;
     initiative_ids?: string[];
+    initiative_id?: string;
   }) => {
     try {
+      // Title validation is already done in AddFeedbackModal
       setLoading(true);
-      // Create new feedback via API with correct property mapping
-      const apiFeedback = {
-        content: feedbackItem.title, // Required for compatibility with the API
-        title: feedbackItem.title,
-        description: feedbackItem.description,
+      
+      const trimmedTitle = feedbackItem.title.trim();
+      
+      // Create the API payload matching exactly what the API client expects
+      const apiPayload = {
+        // The API expects 'content', not 'title' (in the API client)
+        content: trimmedTitle,
+        // This is required by the API client type definition
         customer_id: feedbackItem.customer_id || '',
+        // Optional fields
         sentiment: feedbackItem.sentiment,
-        source: 'manual',
-        initiative_ids: feedbackItem.initiative_ids || []
+        source: 'manual'
       };
       
-      console.log('Creating feedback with data:', apiFeedback);
-      const newFeedback = await apiClient.feedback.create(apiFeedback);
+      console.log('Sending feedback to API:', JSON.stringify(apiPayload, null, 2));
       
-      // Find initiative name if provided
-      const initiativeName = newFeedback.initiative_id
-        ? initiatives.find(i => i.id === newFeedback.initiative_id)?.title
-        : undefined;
-      
-      // Update the local state with the new feedback
-      setFeedback(prevFeedback => [...prevFeedback, {
-        id: newFeedback.id,
-        title: feedbackItem.title,
-        description: feedbackItem.description,
-        sentiment: feedbackItem.sentiment,
-        customer_name: newFeedback.customer_name || 'Unknown',
-        customer_id: feedbackItem.customer_id,
-        createdAt: 'Just now',
-        initiative_id: newFeedback.initiative_id,
-        initiative_name: initiativeName
-      }]);
+      try {
+        // Will be processed by the server to extract title from content if needed
+        const newFeedback = await apiClient.feedback.create(apiPayload);
+        console.log('API response:', newFeedback);
+        
+        if (!newFeedback || !newFeedback.id) {
+          throw new Error('API returned invalid feedback data');
+        }
+        
+        // Now handle initiative associations separately if needed
+        if ((feedbackItem.initiative_id || feedbackItem.initiative_ids?.length) && newFeedback.id) {
+          try {
+            // Update the feedback with initiative data
+            const initiativeUpdate: {
+              initiative_id?: string;
+              initiative_ids?: string[];
+            } = {};
+            
+            if (feedbackItem.initiative_id) {
+              initiativeUpdate.initiative_id = feedbackItem.initiative_id;
+            }
+            
+            if (feedbackItem.initiative_ids?.length) {
+              initiativeUpdate.initiative_ids = feedbackItem.initiative_ids;
+            }
+            
+            await apiClient.feedback.update(newFeedback.id, initiativeUpdate);
+          } catch (initiativeError) {
+            console.error('Failed to associate initiative with feedback:', initiativeError);
+            // Continue even if initiative association fails
+          }
+        }
+        
+        // Find customer name for the new feedback
+        const customerName = feedbackItem.customer_id
+          ? customers.find(c => c.id === feedbackItem.customer_id)?.name || 'Unknown'
+          : 'Unknown';
+          
+        // Update the local state with the new formatted feedback
+        setFeedback(prevFeedback => [
+          ...prevFeedback, 
+          formatFeedbackData({
+            ...newFeedback,
+            id: newFeedback.id,
+            title: trimmedTitle, // Ensure title is preserved locally
+            description: feedbackItem.description || '',
+            sentiment: feedbackItem.sentiment,
+            customer_id: feedbackItem.customer_id,
+            customer_name: customerName
+          })
+        ]);
+        
+        // Show success message to provide user feedback
+        alert('Feedback saved successfully!');
+        
+      } catch (apiError: unknown) {
+        console.error('API Error:', apiError);
+        const errorMessage = apiError instanceof Error ? apiError.message : 'Failed to create feedback';
+        throw new Error(`API Error: ${errorMessage}`);
+      }
     } catch (err: any) {
       console.error('Error creating feedback:', err);
-      alert('Failed to create feedback. Please try again.');
+      alert('Failed to create feedback: ' + (err.message || 'Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -242,68 +333,85 @@ const Feedback = () => {
     sentiment?: FeedbackSentiment;
     customer_id?: string;
     initiative_id?: string;
+    customerId?: string;  // For backward compatibility
+    initiativeId?: string;  // For backward compatibility
   }) => {
     try {
-      console.log('handleUpdateFeedback called with:', id, updatedFeedback);
-      
-      // Find the existing feedback first to ensure we have all required data
+      // Find the existing feedback
       const existingFeedback = feedback.find(f => f.id === id);
       if (!existingFeedback) {
         console.error('Cannot update feedback: feedback item not found');
         return;
       }
-      console.log('Found existing feedback:', existingFeedback);
+      
+      // Normalize property names for consistency
+      const customer_id = updatedFeedback.customer_id || updatedFeedback.customerId;
+      const initiative_id = updatedFeedback.initiative_id || updatedFeedback.initiativeId;
+      
+      // Find customer and initiative names for UI
+      const customerName = customer_id
+        ? customers.find(c => c.id === customer_id)?.name || 'Unknown' 
+        : existingFeedback.customer_name;
+        
+      const initiativeName = initiative_id
+        ? initiatives.find(i => i.id === initiative_id)?.title
+        : existingFeedback.initiative_name;
 
-      // Update local state immediately with optimistic update
-      setFeedback(prevFeedback => prevFeedback.map(item => {
-        if (item.id === id) {
-          // Find related customer for displaying in the UI
-          const customerName = updatedFeedback.customer_id 
-            ? customers.find(c => c.id === updatedFeedback.customer_id)?.name || 'Unknown' 
-            : item.customer_name;
-          
-          // Preserve all existing feedback properties while updating only changed fields
-          return { 
-            ...item, 
-            title: updatedFeedback.title || item.title,
-            description: updatedFeedback.description || item.description,
-            sentiment: updatedFeedback.sentiment || item.sentiment,
-            customer_id: updatedFeedback.customer_id !== undefined ? updatedFeedback.customer_id : item.customer_id,
-            customer_name: customerName,
-            initiative_id: updatedFeedback.initiative_id !== undefined ? updatedFeedback.initiative_id : item.initiative_id
-          };
-        }
-        return item;
-      }));
+      // Update local state immediately (optimistic update)
+      setFeedback(prevFeedback => prevFeedback.map(item => 
+        item.id === id 
+          ? { 
+              ...item, 
+              title: updatedFeedback.title || item.title,
+              description: updatedFeedback.description || item.description,
+              sentiment: updatedFeedback.sentiment || item.sentiment,
+              customer_id: customer_id || item.customer_id,
+              customer_name: customerName,
+              initiative_id: initiative_id || item.initiative_id,
+              initiative_name: initiativeName
+            }
+          : item
+      ));
       
       setLoading(true);
       
       // Create API-compatible update object
       const apiUpdate: any = {};
       
+      // Handle title/description update
       if (updatedFeedback.title || updatedFeedback.description) {
-        // Get the current feedback item
-        const currentFeedback = feedback.find(f => f.id === id);
-        if (currentFeedback) {
-          const title = updatedFeedback.title || currentFeedback.title;
-          const description = updatedFeedback.description || currentFeedback.description;
-          apiUpdate.content = `${title}: ${description}`;
-        }
+        const title = updatedFeedback.title || existingFeedback.title;
+        const description = updatedFeedback.description || existingFeedback.description;
+        apiUpdate.content = `${title}: ${description}`;
       }
       
+      // Better approach: Send title and description separately
+      if (updatedFeedback.title !== undefined) {
+        apiUpdate.title = updatedFeedback.title;
+      }
+      
+      if (updatedFeedback.description !== undefined) {
+        apiUpdate.description = updatedFeedback.description;
+      }
+      
+      // Handle sentiment update
       if (updatedFeedback.sentiment) {
         apiUpdate.sentiment = updatedFeedback.sentiment;
       }
       
-      if (updatedFeedback.customer_id !== undefined) {
-        apiUpdate.customer_id = updatedFeedback.customer_id;
+      // Handle customer_id update
+      if (customer_id !== undefined) {
+        apiUpdate.customer_id = customer_id;
       }
       
-      if (updatedFeedback.initiative_id !== undefined) {
-        apiUpdate.initiative_id = updatedFeedback.initiative_id;
+      // Handle initiative_id update
+      if (initiative_id !== undefined) {
+        apiUpdate.initiative_id = initiative_id;
+      } else if ('initiative_id' in updatedFeedback || 'initiativeId' in updatedFeedback) {
+        // If initiative_id is explicitly set to undefined (selected 'none' in UI),
+        // set it to null to clear the association
+        apiUpdate.initiative_id = null;
       }
-      
-      console.log('Making API call to update feedback with:', apiUpdate);
       
       // Update feedback via API
       await apiClient.feedback.update(id, apiUpdate);
@@ -311,36 +419,18 @@ const Feedback = () => {
       // Fetch the complete updated feedback to ensure we have the latest data
       const refreshedFeedback = await apiClient.feedback.getById(id);
       
-      console.log('DEBUG: Refreshed feedback from API:', refreshedFeedback);
-      console.log('DEBUG: Initiative data from API:', refreshedFeedback.initiative_id, refreshedFeedback.initiatives);
-      
-      // Find related customer for displaying in the UI
-      const customerName = refreshedFeedback.customer_id 
-        ? customers.find(c => c.id === refreshedFeedback.customer_id)?.name || 'Unknown' 
-        : undefined;
-      
-      // Find related initiative for displaying in the UI
-      const initiativeName = refreshedFeedback.initiative_id
-        ? initiatives.find(i => i.id === refreshedFeedback.initiative_id)?.title
-        : undefined;
-      
-      // Create a complete feedback object with all UI-necessary data
-      const completeFeedback = {
+      // Format and update the feedback in state
+      const formattedFeedback = formatFeedbackData({
         ...refreshedFeedback,
-        // Ensure frontend properties are set correctly
         title: updatedFeedback.title || refreshedFeedback.title,
-        description: updatedFeedback.description || refreshedFeedback.description,
-        customer_name: customerName || refreshedFeedback.customer_name,
-        initiative_name: initiativeName,
-        initiative_id: refreshedFeedback.initiative_id,
-        createdAt: refreshedFeedback.createdAt || refreshedFeedback.created_at
-      };
+        // Explicitly pass known customer data if we have it
+        customer_id: refreshedFeedback.customer_id || customer_id,
+        customer_name: customerName
+      });
       
-      console.log('Feedback updated successfully, refreshed data:', completeFeedback);
-      
-      // Update the local state with the full refreshed feedback
+      // Update the local state with the refreshed data
       setFeedback(prevFeedback => prevFeedback.map(item => 
-        item.id === id ? completeFeedback : item
+        item.id === id ? formattedFeedback : item
       ));
     } catch (err: any) {
       console.error('Error updating feedback:', err);
@@ -349,7 +439,11 @@ const Feedback = () => {
       // If API update fails, revert to original state by re-fetching
       try {
         const feedbackData = await apiClient.feedback.getAll();
-        setFeedback(feedbackData);
+        // Make sure to format each feedback item consistently
+        const formattedData = Array.isArray(feedbackData) 
+          ? feedbackData.map(item => formatFeedbackData(item)) 
+          : [];
+        setFeedback(formattedData);
       } catch (refreshErr) {
         console.error('Error refreshing feedback after failed update:', refreshErr);
       }
@@ -360,6 +454,7 @@ const Feedback = () => {
 
   // Handler for deleting feedback
   const handleDeleteFeedback = async (id: string) => {
+    // Use the window.confirm dialog for simplicity
     if (window.confirm("Are you sure you want to delete this feedback item? This action cannot be undone.")) {
       try {
         setLoading(true);
@@ -375,13 +470,6 @@ const Feedback = () => {
         setLoading(false);
       }
     }
-  };
-
-  // Toggle feedback expansion
-  const toggleFeedbackExpanded = (id: string) => {
-    setFeedback(prevFeedback => prevFeedback.map(item => 
-      item.id === id ? { ...item, expanded: !item.expanded } : item
-    ));
   };
 
   // Get filtered feedback based on active tab and filters
@@ -424,7 +512,7 @@ const Feedback = () => {
       let aValue = a[sortColumn];
       let bValue = b[sortColumn];
       
-      // Handle undefined values (treat them as empty strings)
+      // Handle undefined values
       const aCompare = aValue !== undefined ? aValue : '';
       const bCompare = bValue !== undefined ? bValue : '';
       
@@ -689,13 +777,12 @@ const Feedback = () => {
                       {getSortIcon('initiative_id')}
                     </div>
                   </TableHead>
-                  <TableHead className="w-[80px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredFeedback.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center">
+                    <TableCell colSpan={4} className="h-24 text-center">
                       No feedback found matching the current filters.
                     </TableCell>
                   </TableRow>
@@ -703,20 +790,23 @@ const Feedback = () => {
                   filteredFeedback.map((item) => (
                     <React.Fragment key={item.id}>
                       <TableRow 
-                        className={`cursor-pointer hover:bg-muted/50 ${item.expanded ? 'bg-muted/50' : ''}`}
-                        onClick={() => toggleFeedbackExpanded(item.id)}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={(e) => {
+                          // If clicking on action buttons, don't trigger row click
+                          if (e.target instanceof Element && 
+                              (e.target.closest('button') || 
+                               e.target.closest('svg') ||
+                               e.target.closest('a'))) {
+                            return;
+                          }
+                          // Find and click the edit button to open the modal
+                          const editBtn = document.getElementById(`edit-feedback-${item.id}`);
+                          if (editBtn) editBtn.click();
+                        }}
                       >
                         <TableCell className="font-medium">
                           <div>
-                            <div className="font-medium flex items-center gap-2">
-                              <ChevronRight className={`h-4 w-4 transition-transform ${item.expanded ? 'rotate-90' : ''}`} />
-                              {item.title}
-                            </div>
-                            {!item.expanded && (
-                              <div className="text-sm text-gray-500 line-clamp-1 dark:text-gray-400 pl-6">
-                                {item.description}
-                              </div>
-                            )}
+                            <div className="font-medium">{item.title}</div>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -728,115 +818,9 @@ const Feedback = () => {
                           {item.customer_name || 'Unknown'}
                         </TableCell>
                         <TableCell className="hidden sm:table-cell text-sm text-gray-500 dark:text-gray-400">
-                          {item.initiative_name || (item.initiative_id ? initiatives.find(i => i.id === item.initiative_id)?.title : null) || 'None'}
-                        </TableCell>
-                        <TableCell onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center gap-1">
-                            <EditFeedbackModal
-                              feedback={{
-                                id: item.id,
-                                title: item.title,
-                                description: item.description,
-                                sentiment: item.sentiment,
-                                customerId: item.customer_id || '',
-                                customer: item.customer_name,
-                                initiativeId: item.initiative_id || ''
-                              }}
-                              initiatives={initiatives}
-                              customers={customers.map(c => ({ id: c.id, name: c.name }))}
-                              onUpdate={(id, updatedData) => {
-                                // Enhanced debugging 
-                                console.log('EditFeedbackModal submitted data:', updatedData);
-                                console.log('Customer ID from modal:', updatedData.customerId);
-                                console.log('Initiative ID from modal:', updatedData.initiativeId);
-                                
-                                // Map EditFeedbackModal fields to our API format
-                                // When customerId/initiativeId is undefined, it means "none" was selected - we want to clear the ID
-                                const customerIdToUse = updatedData.customerId === undefined ? undefined : updatedData.customerId;
-                                const initiativeIdToUse = updatedData.initiativeId === undefined ? undefined : updatedData.initiativeId;
-                                
-                                console.log('Using customer_id for API:', customerIdToUse);
-                                console.log('Using initiative_id for API:', initiativeIdToUse);
-                                
-                                handleUpdateFeedback(id, {
-                                  title: updatedData.title,
-                                  description: updatedData.description,
-                                  sentiment: updatedData.sentiment,
-                                  customer_id: customerIdToUse,
-                                  initiative_id: initiativeIdToUse
-                                });
-                              }}
-                              triggerButtonSize="icon"
-                            />
-                            
-                            <div className="relative">
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-7 w-7 p-0"
-                                onClick={() => toggleMenu(item.id)}
-                              >
-                                <MoreHorizontal className="h-3.5 w-3.5" />
-                              </Button>
-                              
-                              {showMenu[item.id] && (
-                                <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded shadow-lg z-10 dark:bg-card dark:border-border">
-                                  <div 
-                                    className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center dark:hover:bg-gray-800/50 dark:text-gray-200"
-                                    onClick={() => {
-                                      console.log('View feedback details', item.id);
-                                      toggleMenu(item.id);
-                                    }}
-                                  >
-                                    <ExternalLink className="h-3.5 w-3.5 mr-2" /> View Details
-                                  </div>
-                                  <div 
-                                    className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center text-red-600 dark:hover:bg-gray-800/50"
-                                    onClick={() => {
-                                      handleDeleteFeedback(item.id);
-                                      toggleMenu(item.id);
-                                    }}
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
+                          {item.initiative_name || 'None'}
                         </TableCell>
                       </TableRow>
-                      
-                      {/* Expanded description row */}
-                      {item.expanded && (
-                        <TableRow>
-                          <TableCell colSpan={5} className="bg-muted/30 border-t-0 pt-0 pb-4">
-                            <div className="p-4">
-                              <h4 className="text-sm font-medium mb-1">Description</h4>
-                              <div className="text-sm whitespace-pre-wrap text-gray-700 dark:text-gray-300 bg-white dark:bg-card p-3 rounded border dark:border-gray-800">
-                                {item.description || "No description provided."}
-                              </div>
-                              
-                              <div className="flex flex-wrap gap-3 mt-4">
-                                <div className="text-xs text-gray-500 dark:text-gray-400">
-                                  <span className="font-medium">Created:</span> {item.createdAt}
-                                </div>
-                                
-                                {item.customer_name && (
-                                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                                    <span className="font-medium">Customer:</span> {item.customer_name}
-                                  </div>
-                                )}
-                                
-                                {item.initiative_id && (
-                                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                                    <span className="font-medium">Initiative:</span> {item.initiative_name || initiatives.find(i => i.id === item.initiative_id)?.title || 'Unknown'}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )}
                     </React.Fragment>
                   ))
                 )}
@@ -856,6 +840,41 @@ const Feedback = () => {
           <p className="text-gray-500 text-center mb-4 dark:text-gray-400">Start collecting feedback from your customers using the Add Feedback button above.</p>
         </div>
       )}
+      
+      {/* Hidden edit modal triggers container - moved outside of table structure */}
+      <div className="hidden">
+        {filteredFeedback.map((item) => (
+          <EditFeedbackModal
+            key={`hidden-edit-${item.id}`}
+            feedback={{
+              id: item.id,
+              title: item.title,
+              description: item.description,
+              sentiment: item.sentiment,
+              customer_id: item.customer_id || '',
+              customer: item.customer_name,
+              initiative_id: item.initiative_id || '',
+              createdAt: item.createdAt
+            }}
+            initiatives={initiatives}
+            customers={customers.map(c => ({ id: c.id, name: c.name }))}
+            onUpdate={(id, updatedData) => {
+              const customerIdToUse = updatedData.customer_id === 'none' ? undefined : updatedData.customer_id;
+              const initiativeIdToUse = updatedData.initiative_id === 'none' ? undefined : updatedData.initiative_id;
+              
+              handleUpdateFeedback(id, {
+                title: updatedData.title,
+                description: updatedData.description,
+                sentiment: updatedData.sentiment,
+                customer_id: customerIdToUse,
+                initiative_id: initiativeIdToUse
+              });
+            }}
+            onDelete={handleDeleteFeedback}
+            triggerButtonId={`edit-feedback-${item.id}`}
+          />
+        ))}
+      </div>
     </div>
   );
 };

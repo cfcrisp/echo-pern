@@ -737,8 +737,11 @@ export const ideasApi = {
     title: string;
     description: string;
     priority?: 'urgent' | 'high' | 'medium' | 'low';
+    effort?: 'xs' | 's' | 'm' | 'l' | 'xl';
     status?: 'new' | 'planned' | 'in_progress' | 'completed' | 'rejected';
-    customer_id?: string;
+    customer_ids?: string[];
+    initiative_id?: string;
+    source?: string;
   }) => {
     try {
       return await fetchWithAuth('/ideas', {
@@ -761,8 +764,10 @@ export const ideasApi = {
     title?: string;
     description?: string;
     priority?: 'urgent' | 'high' | 'medium' | 'low';
+    effort?: 'xs' | 's' | 'm' | 'l' | 'xl';
     status?: 'new' | 'planned' | 'in_progress' | 'completed' | 'rejected';
-    customer_id?: string;
+    customer_ids?: string[];
+    initiative_id?: string;
   }) => {
     try {
       return await fetchWithAuth(`/ideas/${id}`, {

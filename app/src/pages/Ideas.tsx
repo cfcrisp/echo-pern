@@ -6,11 +6,12 @@ import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Tabl
 import { Badge } from "@/components/ui/badge";
 import { 
   ChevronRight, Lightbulb, MessageSquare, X,
-  MoreHorizontal, Trash2, Pencil, ExternalLink,
+  MoreHorizontal, Trash2, Pencil, 
   Plus, Filter, ArrowUpDown, ArrowUp, ArrowDown, Users
 } from 'lucide-react';
 import React from 'react';
 import { AddIdeaModal, EditIdeaModal } from "@/components/shared";
+import type { UpdateIdeaData } from "@/components/shared/EditIdeaModal";
 import apiClient from '@/services/apiClient';
 import { useAuth } from '@/context/AuthContext';
 
@@ -27,10 +28,12 @@ type Idea = {
   priority: IdeaPriority;
   effort: IdeaEffort;
   customer_name?: string;
-  customer_id?: string;
+  customer_ids: string[];
   initiative_id?: string;
+  initiative_name?: string;
   createdAt: string;
   votes?: number;
+  initiatives?: Array<{ id: string; title: string }>;
 };
 
 type FilterState = {
@@ -39,7 +42,7 @@ type FilterState = {
   customer: string | 'all';
 };
 
-type SortColumn = 'title' | 'priority' | 'status' | 'customer_name' | 'votes' | 'createdAt' | null;
+type SortColumn = 'title' | 'priority' | 'status' | 'customer_name' | 'initiative_name' | null;
 type SortDirection = 'asc' | 'desc';
 
 // Ideas Component
@@ -64,6 +67,68 @@ const Ideas = () => {
   
   const [customers, setCustomers] = useState<Array<{ id: string; name: string }>>([]);
   const [initiatives, setInitiatives] = useState<Array<{ id: string; title: string }>>([]);
+  
+  // Helper function to extract initiative data from various API response formats
+  const extractInitiativeData = (item: any) => {
+    // Initialize with default values
+    let initiativeId = item.initiative_id;
+    let initiativeName;
+    
+    // Check for initiatives array from server
+    if (!initiativeId && item.initiatives && item.initiatives.length > 0) {
+      initiativeId = item.initiatives[0].id;
+      initiativeName = item.initiatives[0].title;
+    } else if (initiativeId) {
+      // Find initiative name if we have the ID
+      initiativeName = initiatives.find(i => i.id === initiativeId)?.title;
+    }
+    
+    return { initiativeId, initiativeName };
+  };
+  
+  // Helper function to extract customer data
+  const extractCustomerData = (item: any) => {
+    // Get customer ID from the item
+    const customerId = item?.customer_id || null;
+    
+    // If we have a customer ID, look up the name
+    let customerName = item?.customer_name || null;
+    
+    if (customerId && customers.length > 0 && (!customerName || customerName === 'Unknown')) {
+      // Find the customer in our local state
+      const customer = customers.find(c => c.id === customerId);
+      if (customer?.name) {
+        customerName = customer.name;
+      }
+    }
+    
+    return { 
+      customerId, 
+      customerName: customerName || 'Unknown' 
+    };
+  };
+  
+  // Helper function to format idea data consistently
+  const formatIdeaData = (item: any): Idea => {
+    const { initiativeId, initiativeName } = extractInitiativeData(item);
+    const { customerId, customerName } = extractCustomerData(item);
+    
+    return {
+      id: item.id,
+      title: item.title,
+      description: item.description || '',
+      priority: item.priority || 'medium',
+      status: item.status || 'new',
+      effort: item.effort || 'm',
+      customer_name: customerName,
+      customer_ids: item.customer_ids || [],
+      initiative_id: initiativeId,
+      initiative_name: initiativeName,
+      createdAt: item.created_at || item.createdAt || 'Recently',
+      votes: item.votes || 0,
+      initiatives: item.initiatives
+    };
+  };
   
   // Fetch customers and initiatives when the component mounts
   useEffect(() => {
@@ -98,28 +163,19 @@ const Ideas = () => {
     fetchRelatedData();
   }, []);
   
-  // Fetch ideas data when component mounts
+  // Fetch ideas data when component mounts and initiatives load
   useEffect(() => {
     const fetchIdeas = async () => {
       try {
         setLoading(true);
+        
+        // Fetch ideas even if initiatives aren't loaded yet
         const data = await apiClient.ideas.getAll();
         
-        // If data is undefined or null, treat as empty array
-        const ideasData = data || [];
-        
-        // Format the data to match our Idea type if needed
-        const formattedData = ideasData.map((idea: any) => ({
-          id: idea.id,
-          title: idea.title,
-          description: idea.description || '',
-          priority: idea.priority || 'medium',
-          status: idea.status || 'new',
-          customer_name: idea.customer_name || 'Unknown',
-          customer_id: idea.customer_id,
-          votes: idea.votes || 0,
-          createdAt: idea.created_at || 'Recently'
-        }));
+        // Format the data consistently using our helper
+        const formattedData = Array.isArray(data) 
+          ? data.map(formatIdeaData) 
+          : [];
         
         setIdeas(formattedData);
         setError(null);
@@ -140,10 +196,14 @@ const Ideas = () => {
     };
 
     fetchIdeas();
-  }, []);
+  }, []); // Don't depend on initiatives, fetch ideas independently
   
   // Toggle menu visibility
-  const toggleMenu = (id: string) => {
+  const toggleMenu = (id: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation(); // Prevent event from bubbling up
+    }
+    
     setShowMenu(prev => {
       // Close all other menus
       const newState: Record<string, boolean> = {};
@@ -154,10 +214,45 @@ const Ideas = () => {
     });
   };
   
+  // Close all menus when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      // Don't close if clicking on a menu or dropdown-related element
+      const target = e.target as HTMLElement;
+      if (target.closest('.dropdown-menu') || target.closest('.dropdown-trigger')) {
+        return;
+      }
+      setShowMenu({});
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, []);
+  
   // Toggle filter menu
-  const toggleFilterMenu = () => {
+  const toggleFilterMenu = (e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation(); // Prevent event from bubbling up
+    }
     setShowFilterMenu(prev => !prev);
   };
+  
+  // Close filter menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const filterMenuElement = document.querySelector('.filter-menu-container');
+      if (filterMenuElement && !filterMenuElement.contains(e.target as Node)) {
+        setShowFilterMenu(false);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, []);
   
   // Clear all filters
   const clearAllFilters = () => {
@@ -196,7 +291,7 @@ const Ideas = () => {
     effort: IdeaEffort;
     status: IdeaStatus;
     initiative_id?: string;
-    customer_ids?: string[];
+    customer_ids: string[];
     source: string;
   }) => {
     try {
@@ -204,31 +299,67 @@ const Ideas = () => {
       
       // Format the data for the API
       const apiIdea = {
-        ...ideaData,
-        // For backward compatibility with the API
-        customer_id: ideaData.customer_ids && ideaData.customer_ids.length > 0 
-          ? ideaData.customer_ids[0] 
-          : undefined,
-        customer_ids: ideaData.customer_ids || []
+        title: ideaData.title,
+        description: ideaData.description,
+        priority: ideaData.priority,
+        effort: ideaData.effort,
+        status: ideaData.status,
+        initiative_id: ideaData.initiative_id === 'none' ? undefined : ideaData.initiative_id,
+        customer_ids: ideaData.customer_ids,
+        source: ideaData.source
       };
       
       console.log('Creating idea with data:', apiIdea);
+      
+      // Make the API call to create the idea
       const newIdea = await apiClient.ideas.create(apiIdea);
       
-      // Update the local state with the new idea
-      setIdeas(prevIdeas => [...prevIdeas, {
-        id: newIdea.id,
-        title: ideaData.title,
-        description: ideaData.description,
-        status: ideaData.status,
-        priority: ideaData.priority,
-        effort: ideaData.effort,
-        customer_name: newIdea.customer_name || 'Unknown',
-        customer_id: apiIdea.customer_id,
-        initiative_id: ideaData.initiative_id,
-        createdAt: 'Just now',
-        votes: newIdea.votes || 0
-      }]);
+      if (!newIdea || !newIdea.id) {
+        throw new Error('Failed to create idea - no data returned from API');
+      }
+      
+      console.log('Successfully created idea with ID:', newIdea.id);
+      
+      // Find customer name for the UI display - use first customer if multiple
+      const customerName = ideaData.customer_ids && ideaData.customer_ids.length > 0
+        ? customers.find(c => c.id === ideaData.customer_ids[0])?.name || 'Unknown'
+        : 'Unknown';
+      
+      // Find initiative name for the new idea if we have an initiative_id
+      const initiativeName = apiIdea.initiative_id
+        ? initiatives.find(i => i.id === apiIdea.initiative_id)?.title
+        : undefined;
+      
+      // Update the local state with the new formatted idea
+      setIdeas(prevIdeas => [
+        ...prevIdeas,
+        formatIdeaData({
+          ...newIdea,
+          id: newIdea.id,
+          title: apiIdea.title,
+          description: apiIdea.description,
+          status: apiIdea.status,
+          priority: apiIdea.priority,
+          effort: apiIdea.effort,
+          customer_ids: ideaData.customer_ids,
+          customer_name: customerName,
+          initiative_id: apiIdea.initiative_id,
+          initiative_name: initiativeName,
+          created_at: new Date().toISOString()
+        })
+      ]);
+      
+      // Optional: Refresh all ideas from the server to ensure data consistency
+      setTimeout(async () => {
+        try {
+          const refreshedData = await apiClient.ideas.getAll();
+          if (Array.isArray(refreshedData) && refreshedData.length > 0) {
+            setIdeas(refreshedData.map(formatIdeaData));
+          }
+        } catch (refreshErr) {
+          console.error('Error refreshing ideas after creation:', refreshErr);
+        }
+      }, 1000);
       
     } catch (err: any) {
       console.error('Error creating idea:', err);
@@ -240,32 +371,22 @@ const Ideas = () => {
 
   // Handler for deleting idea
   const handleDeleteIdea = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this idea? This action cannot be undone.')) {
-      return;
-    }
-    
-    try {
-      await apiClient.ideas.delete(id);
-      
-      // Update the local state by filtering out the deleted idea
-      setIdeas(prevIdeas => prevIdeas.filter(idea => idea.id !== id));
-      
-    } catch (err) {
-      console.error('Error deleting idea:', err);
-      alert('Failed to delete the idea. Please try again.');
+    if (window.confirm('Are you sure you want to delete this idea? This action cannot be undone.')) {
+      try {
+        await apiClient.ideas.delete(id);
+        
+        // Update the local state by filtering out the deleted idea
+        setIdeas(prevIdeas => prevIdeas.filter(idea => idea.id !== id));
+        
+      } catch (err) {
+        console.error('Error deleting idea:', err);
+        alert('Failed to delete the idea. Please try again.');
+      }
     }
   };
 
-  // Handle updating an idea
-  const handleUpdateIdea = async (id: string, updatedData: {
-    title: string;
-    description: string;
-    priority: IdeaPriority;
-    effort: IdeaEffort;
-    status: IdeaStatus;
-    customer_id?: string;
-    initiative_id?: string;
-  }) => {
+  // Handler for updating an idea
+  const handleUpdateIdea = async (id: string, updatedData: UpdateIdeaData) => {
     try {
       console.log('handleUpdateIdea called with:', id, updatedData);
 
@@ -275,21 +396,23 @@ const Ideas = () => {
         console.error('Cannot update idea: idea not found');
         return;
       }
-      console.log('Found existing idea:', existingIdea);
+      
+      // Normalize property names for consistency
+      const customer_ids = updatedData.customer_ids;
+      const initiative_id = updatedData.initiativeId;
+      
+      // Find customer and initiative names for UI
+      const customerName = customer_ids.length > 0
+        ? customers.find(c => c.id === customer_ids[0])?.name || 'Unknown'
+        : existingIdea.customer_name;
+        
+      const initiativeName = initiative_id
+        ? initiatives.find(i => i.id === initiative_id)?.title
+        : existingIdea.initiative_name;
 
       // Update local state immediately with optimistic update
       setIdeas(prevIdeas => prevIdeas.map(idea => {
         if (idea.id === id) {
-          // Find related entities for displaying in the UI
-          const customerName = updatedData.customer_id 
-            ? customers.find(c => c.id === updatedData.customer_id)?.name || 'Unknown' 
-            : undefined;
-            
-          const initiativeName = updatedData.initiative_id
-            ? initiatives.find(i => i.id === updatedData.initiative_id)?.title
-            : undefined;
-          
-          // Preserve all existing idea properties while updating only changed fields
           return { 
             ...idea, 
             title: updatedData.title,
@@ -297,8 +420,8 @@ const Ideas = () => {
             priority: updatedData.priority,
             effort: updatedData.effort,
             status: updatedData.status,
-            customer_id: updatedData.customer_id,
-            initiative_id: updatedData.initiative_id,
+            customer_ids: customer_ids,
+            initiative_id: initiative_id,
             customer_name: customerName,
             initiative_name: initiativeName
           };
@@ -309,39 +432,39 @@ const Ideas = () => {
       // Show loading state
       setLoading(true);
       
-      console.log('Making API call to update idea with:', updatedData);
+      // Create API-compatible update object
+      const apiUpdate = {
+        title: updatedData.title,
+        description: updatedData.description,
+        priority: updatedData.priority,
+        effort: updatedData.effort,
+        status: updatedData.status,
+        customer_ids: customer_ids,
+        initiative_id: initiative_id
+      };
+      
+      console.log('Making API call to update idea with:', apiUpdate);
       
       // Update the idea in the API
-      await apiClient.ideas.update(id, updatedData);
+      await apiClient.ideas.update(id, apiUpdate);
       
       // Fetch the complete updated idea to ensure we have the latest data
       const refreshedIdea = await apiClient.ideas.getById(id);
       
-      // Find related entities for displaying in the UI
-      const customerName = refreshedIdea.customer_id 
-        ? customers.find(c => c.id === refreshedIdea.customer_id)?.name || 'Unknown' 
-        : undefined;
-        
-      const initiativeName = refreshedIdea.initiative_id
-        ? initiatives.find(i => i.id === refreshedIdea.initiative_id)?.title
-        : undefined;
-      
-      // Create a complete idea object with all UI-necessary data
-      const completeIdea = {
+      // Format and update the idea in state
+      const formattedIdea = formatIdeaData({
         ...refreshedIdea,
+        customer_ids: refreshedIdea.customer_ids || customer_ids,
         customer_name: customerName,
-        initiative_name: initiativeName,
-        // Ensure we preserve any UI-specific properties not returned by the API
-        createdAt: refreshedIdea.createdAt || refreshedIdea.created_at,
-        // Make sure we keep other properties the UI expects
-        votes: refreshedIdea.votes !== undefined ? refreshedIdea.votes : 0
-      };
+        initiative_id: refreshedIdea.initiative_id || initiative_id,
+        initiative_name: initiativeName
+      });
       
-      console.log('Idea updated successfully, refreshed data:', completeIdea);
+      console.log('Idea updated successfully, refreshed data:', formattedIdea);
       
       // Update the local state with the full refreshed idea
       setIdeas(prevIdeas => prevIdeas.map(idea => 
-        idea.id === id ? completeIdea : idea
+        idea.id === id ? formattedIdea : idea
       ));
       
     } catch (err) {
@@ -350,8 +473,11 @@ const Ideas = () => {
       
       // If API update fails, revert to original state by re-fetching
       try {
-        const ideas = await apiClient.ideas.getAll();
-        setIdeas(ideas);
+        const ideasData = await apiClient.ideas.getAll();
+        const formattedData = Array.isArray(ideasData) 
+          ? ideasData.map(item => formatIdeaData(item)) 
+          : [];
+        setIdeas(formattedData);
       } catch (refreshErr) {
         console.error('Error refreshing ideas after failed update:', refreshErr);
       }
@@ -384,14 +510,16 @@ const Ideas = () => {
   }
   
   if (filters.customer !== 'all') {
-    filteredIdeas = filteredIdeas.filter(idea => idea.customer_id === filters.customer);
+    filteredIdeas = filteredIdeas.filter(idea => 
+      idea.customer_ids?.includes(filters.customer)
+    );
   }
   
   // Sort ideas based on current sort state
   if (sortColumn) {
     filteredIdeas = [...filteredIdeas].sort((a, b) => {
-      let aValue = a[sortColumn];
-      let bValue = b[sortColumn];
+      let aValue: any = a[sortColumn];
+      let bValue: any = b[sortColumn];
       
       // Special handling for priority sorting (high > medium > low)
       if (sortColumn === 'priority') {
@@ -400,9 +528,9 @@ const Ideas = () => {
         bValue = priorityValues[b.priority as keyof typeof priorityValues];
       }
       
-      // Handle undefined values (treat them as empty strings or 0 for numbers)
-      const aCompare = aValue !== undefined ? aValue : (typeof aValue === 'number' ? 0 : '');
-      const bCompare = bValue !== undefined ? bValue : (typeof bValue === 'number' ? 0 : '');
+      // Convert to strings for comparison (handles undefined and null values)
+      const aCompare = aValue != null ? String(aValue) : '';
+      const bCompare = bValue != null ? String(bValue) : '';
       
       if (aCompare < bCompare) {
         return sortDirection === 'asc' ? -1 : 1;
@@ -578,11 +706,11 @@ const Ideas = () => {
               </div>
               
               {/* Filter button */}
-              <div className="relative">
+              <div className="relative filter-menu-container">
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  onClick={toggleFilterMenu}
+                  onClick={(e) => toggleFilterMenu(e)}
                   className="h-7 gap-1 text-xs"
                 >
                   <Filter className="h-3 w-3" />
@@ -723,42 +851,43 @@ const Ideas = () => {
                     </div>
                   </TableHead>
                   <TableHead 
-                    className="w-[80px] text-center cursor-pointer"
-                    onClick={() => handleSort('votes')}
-                  >
-                    <div className="flex items-center justify-center">
-                      Votes
-                      {getSortIcon('votes')}
-                    </div>
-                  </TableHead>
-                  <TableHead 
-                    className="hidden sm:table-cell w-[120px] cursor-pointer"
-                    onClick={() => handleSort('createdAt')}
+                    className="hidden sm:table-cell w-[150px] cursor-pointer"
+                    onClick={() => handleSort('initiative_name')}
                   >
                     <div className="flex items-center">
-                      Created
-                      {getSortIcon('createdAt')}
+                      Initiative
+                      {getSortIcon('initiative_name')}
                     </div>
                   </TableHead>
-                  <TableHead className="w-[80px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredIdeas.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center">
+                    <TableCell colSpan={5} className="h-24 text-center">
                       No ideas found matching the current filters.
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredIdeas.map((idea) => (
-                    <TableRow key={idea.id}>
+                    <TableRow 
+                      key={idea.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={(e) => {
+                        // If clicking on action buttons, don't trigger row click
+                        if (e.target instanceof Element && 
+                            (e.target.closest('button') || 
+                            e.target.closest('svg'))) {
+                          return;
+                        }
+                        // Find and click the edit button
+                        const editBtn = document.getElementById(`edit-idea-${idea.id}`);
+                        if (editBtn) editBtn.click();
+                      }}
+                    >
                       <TableCell className="font-medium">
                         <div>
                           <div className="font-medium">{idea.title}</div>
-                          <div className="text-sm text-gray-500 line-clamp-1 dark:text-gray-400">
-                            {idea.description}
-                          </div>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -774,86 +903,8 @@ const Ideas = () => {
                       <TableCell className="hidden sm:table-cell">
                         {idea.customer_name || 'Unknown'}
                       </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="outline" className="px-2 font-mono">
-                          {idea.votes}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="hidden sm:table-cell text-sm text-gray-500 dark:text-gray-400">
-                        {idea.createdAt}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <EditIdeaModal
-                            idea={{
-                              id: idea.id,
-                              title: idea.title,
-                              description: idea.description,
-                              priority: idea.priority,
-                              effort: idea.effort || 'm',
-                              status: idea.status === 'in_progress' ? 'planned' : idea.status,
-                              customerId: idea.customer_id,
-                              customer: idea.customer_name
-                            }}
-                            initiatives={initiatives}
-                            customers={customers}
-                            onUpdate={(id, updatedData) => {
-                              // Map EditIdeaModal fields to our API format
-                              handleUpdateIdea(id, {
-                                title: updatedData.title,
-                                description: updatedData.description, 
-                                priority: updatedData.priority,
-                                effort: updatedData.effort,
-                                status: updatedData.status,
-                                customer_id: updatedData.customerId,
-                                initiative_id: updatedData.initiativeId
-                              });
-                            }}
-                            triggerButtonSize="icon"
-                          />
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-7 w-7 p-0"
-                            onClick={() => console.log('View idea details', idea.id)}
-                          >
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </Button>
-                          
-                          <div className="relative">
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="h-7 w-7 p-0"
-                              onClick={() => toggleMenu(idea.id)}
-                            >
-                              <MoreHorizontal className="h-3.5 w-3.5" />
-                            </Button>
-                            
-                            {showMenu[idea.id] && (
-                              <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded shadow-lg z-10 dark:bg-card dark:border-border">
-                                <div 
-                                  className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center dark:hover:bg-gray-800/50 dark:text-gray-200"
-                                  onClick={() => {
-                                    console.log('View idea details', idea.id);
-                                    toggleMenu(idea.id);
-                                  }}
-                                >
-                                  <ExternalLink className="h-3.5 w-3.5 mr-2" /> View Details
-                                </div>
-                                <div 
-                                  className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center text-red-600 dark:hover:bg-gray-800/50"
-                                  onClick={() => {
-                                    handleDeleteIdea(idea.id);
-                                    toggleMenu(idea.id);
-                                  }}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                      <TableCell className="hidden sm:table-cell">
+                        {idea.initiative_name || 'None'}
                       </TableCell>
                     </TableRow>
                   ))
@@ -874,6 +925,35 @@ const Ideas = () => {
           <p className="text-gray-500 text-center mb-4 dark:text-gray-400">Start capturing feature requests and ideas from your customers using the Add Idea button above.</p>
         </div>
       )}
+      
+      {/* Hidden edit modal triggers that will be activated programmatically */}
+      <div className="hidden">
+        {ideas.map(idea => (
+          <EditIdeaModal
+            key={`hidden-edit-${idea.id}`}
+            idea={{
+              id: idea.id,
+              title: idea.title,
+              description: idea.description,
+              priority: idea.priority,
+              effort: idea.effort || 'm',
+              status: idea.status === 'in_progress' ? 'planned' : idea.status,
+              customerId: idea.customer_ids?.[0], // Get first customer ID if available
+              customer: idea.customer_name,
+              initiativeId: idea.initiative_id,
+              initiative: idea.initiative_name,
+              createdAt: idea.createdAt
+            }}
+            initiatives={initiatives}
+            customers={customers}
+            onUpdate={(id, updatedData: UpdateIdeaData) => {
+              handleUpdateIdea(id, updatedData);
+            }}
+            onDelete={handleDeleteIdea}
+            triggerButtonId={`edit-idea-${idea.id}`}
+          />
+        ))}
+      </div>
     </div>
   );
 };

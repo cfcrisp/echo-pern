@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Pencil } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -34,8 +34,21 @@ export type Idea = {
   status: IdeaStatus;
   initiative?: string;
   initiativeId?: string;
+  initiative_id?: string;
   customer?: string;
   customerId?: string;
+  customer_ids?: string[];
+  createdAt?: string;
+};
+
+export type UpdateIdeaData = {
+  title: string;
+  description: string;
+  priority: IdeaPriority;
+  effort: IdeaEffort;
+  status: IdeaStatus;
+  initiativeId?: string;
+  customer_ids: string[];
 };
 
 type Initiative = {
@@ -52,16 +65,10 @@ type EditIdeaModalProps = {
   idea: Idea;
   initiatives: Initiative[];
   customers: Customer[];
-  onUpdate: (id: string, updatedIdea: {
-    title: string;
-    description: string;
-    priority: IdeaPriority;
-    effort: IdeaEffort;
-    status: IdeaStatus;
-    initiativeId?: string;
-    customerId?: string;
-  }) => void;
+  onUpdate: (id: string, updatedIdea: UpdateIdeaData) => void;
+  onDelete?: (id: string) => void;
   triggerButtonSize?: 'default' | 'sm' | 'lg' | 'icon';
+  triggerButtonId?: string;
 };
 
 export function EditIdeaModal({ 
@@ -69,30 +76,24 @@ export function EditIdeaModal({
   initiatives, 
   customers, 
   onUpdate, 
-  triggerButtonSize = 'default' 
+  onDelete,
+  triggerButtonSize = 'default',
+  triggerButtonId
 }: EditIdeaModalProps) {
   const [open, setOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    priority: 'medium' as IdeaPriority,
-    effort: 'm' as IdeaEffort,
-    status: 'new' as IdeaStatus,
-    initiativeId: '',
-    customerId: ''
+  const [formData, setFormData] = useState<Idea>({
+    ...idea,
+    initiativeId: idea.initiativeId || idea.initiative_id,
+    customerId: idea.customerId || (idea.customer_ids && idea.customer_ids[0])
   });
 
   // Initialize form with idea data when modal opens
   useEffect(() => {
     if (open) {
       setFormData({
-        title: idea.title,
-        description: idea.description,
-        priority: idea.priority,
-        effort: idea.effort,
-        status: idea.status,
-        initiativeId: idea.initiativeId || '',
-        customerId: idea.customerId || ''
+        ...idea,
+        initiativeId: idea.initiativeId || idea.initiative_id,
+        customerId: idea.customerId || (idea.customer_ids && idea.customer_ids[0])
       });
     }
   }, [open, idea]);
@@ -101,21 +102,33 @@ export function EditIdeaModal({
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = () => {
-    // Convert "none" values back to undefined before submission
-    const submittedData = {
-      ...formData,
-      initiativeId: formData.initiativeId === 'none' ? undefined : formData.initiativeId,
-      customerId: formData.customerId === 'none' ? undefined : formData.customerId
-    };
-    onUpdate(idea.id, submittedData);
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onUpdate(idea.id, {
+      title: formData.title,
+      description: formData.description,
+      priority: formData.priority,
+      effort: formData.effort,
+      status: formData.status,
+      initiativeId: formData.initiativeId,
+      customer_ids: formData.customerId ? [formData.customerId] : []
+    });
     setOpen(false);
   };
 
+  // Handler for dialog open state changes (clicking outside will trigger this)
+  const handleOpenChange = (newOpenState: boolean) => {
+    setOpen(newOpenState);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        {triggerButtonSize === 'icon' ? (
+        {triggerButtonId ? (
+          <Button id={triggerButtonId} variant="ghost" size="sm" className="hidden">
+            Edit
+          </Button>
+        ) : triggerButtonSize === 'icon' ? (
           <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
             <Pencil className="h-4 w-4" />
           </Button>
@@ -126,14 +139,26 @@ export function EditIdeaModal({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[525px]">
         <DialogHeader>
           <DialogTitle>Edit Idea</DialogTitle>
-          <DialogDescription>
-            Make changes to the idea "{idea.title}".
+          <DialogDescription className="mt-2">
+            <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+              <div>
+                <span className="font-medium">Created:</span> {idea.createdAt || 'Recently'}
+              </div>
+              {idea.customer && (
+                <div>
+                  <span className="font-medium">Customer:</span> {idea.customer}
+                </div>
+              )}
+              <div>
+                <span className="font-medium">Status:</span> {idea.status.replace('_', ' ')}
+              </div>
+            </div>
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
+        <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
           <FormItem>
             <FormLabel htmlFor="title">Title</FormLabel>
             <Input 
@@ -239,9 +264,29 @@ export function EditIdeaModal({
             </Select>
           </FormItem>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-          <Button onClick={handleSubmit}>Update Idea</Button>
+        <DialogFooter className="flex items-center justify-between">
+          <div>
+            {onDelete && (
+              <Button 
+                variant="destructive" 
+                size="sm"
+                onClick={() => {
+                  if (window.confirm("Are you sure you want to delete this idea? This action cannot be undone.")) {
+                    onDelete(idea.id);
+                    setOpen(false);
+                  }
+                }}
+                className="mr-auto"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button onClick={handleSubmit}>Update Idea</Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

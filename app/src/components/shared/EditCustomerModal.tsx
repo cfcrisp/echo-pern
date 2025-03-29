@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Pencil } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -36,10 +36,12 @@ type EditCustomerModalProps = {
     revenue: string;
     status: CustomerStatus;
   }) => void;
+  onDelete?: (id: string) => void;
   triggerButtonSize?: 'default' | 'sm' | 'lg' | 'icon';
+  triggerButtonId?: string;
 };
 
-export function EditCustomerModal({ customer, onUpdate, triggerButtonSize = 'default' }: EditCustomerModalProps) {
+export function EditCustomerModal({ customer, onUpdate, onDelete, triggerButtonSize = 'default', triggerButtonId }: EditCustomerModalProps) {
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -67,10 +69,19 @@ export function EditCustomerModal({ customer, onUpdate, triggerButtonSize = 'def
     setOpen(false);
   };
 
+  // Handler for dialog open state changes (clicking outside will trigger this)
+  const handleOpenChange = (newOpenState: boolean) => {
+    setOpen(newOpenState);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        {triggerButtonSize === 'icon' ? (
+        {triggerButtonId ? (
+          <Button id={triggerButtonId} variant="ghost" size="sm" className="hidden">
+            Edit
+          </Button>
+        ) : triggerButtonSize === 'icon' ? (
           <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
             <Pencil className="h-4 w-4" />
           </Button>
@@ -124,9 +135,29 @@ export function EditCustomerModal({ customer, onUpdate, triggerButtonSize = 'def
             </Select>
           </FormItem>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-          <Button onClick={handleSubmit}>Update Customer</Button>
+        <DialogFooter className="flex items-center justify-between">
+          <div>
+            {onDelete && (
+              <Button 
+                variant="destructive" 
+                size="sm"
+                onClick={() => {
+                  if (window.confirm("Are you sure you want to delete this customer? This action cannot be undone.")) {
+                    onDelete(customer.id);
+                    setOpen(false);
+                  }
+                }}
+                className="mr-auto"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button onClick={handleSubmit}>Update Customer</Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

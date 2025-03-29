@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { MessageSquare } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import {
@@ -20,22 +20,6 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Check, ChevronsUpDown } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 type FeedbackSentiment = 'positive' | 'neutral' | 'negative';
 
@@ -46,6 +30,7 @@ type FeedbackModalProps = {
     sentiment: FeedbackSentiment;
     customer_id?: string;
     initiative_ids?: string[];
+    initiative_id?: string;
   }) => void;
   initiatives?: Array<{ id: string; title: string }>;
   customers?: Array<{ id: string; name: string }>;
@@ -64,48 +49,40 @@ export function AddFeedbackModal({
     description: '',
     sentiment: 'neutral' as FeedbackSentiment,
     customer_id: undefined as string | undefined,
-    initiative_ids: [] as string[]
+    initiative_id: undefined as string | undefined,
   });
-  const [openCustomerCombobox, setOpenCustomerCombobox] = useState(false);
-  const [openInitiativeCombobox, setOpenInitiativeCombobox] = useState(false);
 
   const handleChange = (field: string, value: any) => {
-    setFeedback(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleInitiativeToggle = (initiativeId: string) => {
-    setFeedback(prev => {
-      const currentInitiatives = [...prev.initiative_ids];
-      const index = currentInitiatives.indexOf(initiativeId);
-      
-      if (index === -1) {
-        // Add initiative
-        return { ...prev, initiative_ids: [...currentInitiatives, initiativeId] };
-      } else {
-        // Remove initiative
-        currentInitiatives.splice(index, 1);
-        return { ...prev, initiative_ids: currentInitiatives };
-      }
-    });
+    if ((field === 'customer_id' || field === 'initiative_id') && value === 'none') {
+      setFeedback(prev => ({ ...prev, [field]: undefined }));
+    } else {
+      setFeedback(prev => ({ ...prev, [field]: value }));
+    }
   };
 
   const handleSubmit = () => {
-    onSave(feedback);
+    // Validate title
+    if (!feedback.title?.trim()) {
+      alert('Please enter a title for the feedback');
+      return;
+    }
+
+    // Send data to parent component
+    onSave({
+      ...feedback,
+      title: feedback.title.trim(),
+      initiative_ids: feedback.initiative_id ? [feedback.initiative_id] : []
+    });
+    
+    // Reset form and close modal
     setFeedback({
       title: '',
       description: '',
       sentiment: 'neutral',
       customer_id: undefined,
-      initiative_ids: []
+      initiative_id: undefined,
     });
     setOpen(false);
-  };
-
-  const getInitiativeTitles = () => {
-    return feedback.initiative_ids
-      .map(id => initiatives.find(initiative => initiative.id === id)?.title)
-      .filter(title => title !== undefined)
-      .join(', ');
   };
 
   return (
@@ -158,111 +135,40 @@ export function AddFeedbackModal({
               </SelectContent>
             </Select>
           </FormItem>
-          {customers.length > 0 && (
-            <FormItem>
-              <FormLabel htmlFor="customer">Customer</FormLabel>
-              <Popover open={openCustomerCombobox} onOpenChange={setOpenCustomerCombobox}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={openCustomerCombobox}
-                    className="w-full justify-between"
-                  >
-                    {feedback.customer_id
-                      ? customers.find((customer) => customer.id === feedback.customer_id)?.name
-                      : "Select customer..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                  <Command>
-                    <CommandInput placeholder="Search customer..." />
-                    <CommandEmpty>No customer found.</CommandEmpty>
-                    <CommandGroup>
-                      <ScrollArea className="h-[200px]">
-                        {customers.map((customer) => (
-                          <CommandItem
-                            key={customer.id}
-                            value={customer.id}
-                            onSelect={() => {
-                              handleChange('customer_id', customer.id === feedback.customer_id ? undefined : customer.id);
-                              setOpenCustomerCombobox(false);
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                feedback.customer_id === customer.id ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                            {customer.name}
-                          </CommandItem>
-                        ))}
-                      </ScrollArea>
-                    </CommandGroup>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            </FormItem>
-          )}
-          {initiatives.length > 0 && (
-            <FormItem>
-              <FormLabel htmlFor="initiatives">Related Initiatives</FormLabel>
-              <Popover open={openInitiativeCombobox} onOpenChange={setOpenInitiativeCombobox}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={openInitiativeCombobox}
-                    className="w-full justify-between"
-                  >
-                    {feedback.initiative_ids.length > 0
-                      ? `${feedback.initiative_ids.length} selected`
-                      : "Select initiatives..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                  <Command>
-                    <CommandInput placeholder="Search initiatives..." />
-                    <CommandEmpty>No initiative found.</CommandEmpty>
-                    <CommandGroup>
-                      <ScrollArea className="h-[200px]">
-                        {initiatives.map((initiative) => (
-                          <CommandItem
-                            key={initiative.id}
-                            value={initiative.id}
-                            onSelect={() => handleInitiativeToggle(initiative.id)}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                feedback.initiative_ids.includes(initiative.id) ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                            {initiative.title}
-                          </CommandItem>
-                        ))}
-                      </ScrollArea>
-                    </CommandGroup>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-              {feedback.initiative_ids.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {feedback.initiative_ids.map(id => {
-                    const initiative = initiatives.find(i => i.id === id);
-                    return initiative ? (
-                      <Badge key={id} variant="secondary" className="mr-1 mb-1">
-                        {initiative.title}
-                      </Badge>
-                    ) : null;
-                  })}
-                </div>
-              )}
-            </FormItem>
-          )}
+          <FormItem>
+            <FormLabel htmlFor="customer">Customer</FormLabel>
+            <Select 
+              value={feedback.customer_id || 'none'} 
+              onValueChange={(value) => handleChange('customer_id', value)}
+            >
+              <SelectTrigger id="customer">
+                <SelectValue placeholder="Select customer..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None (General feedback)</SelectItem>
+                {customers.map((customer) => (
+                  <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FormItem>
+          <FormItem>
+            <FormLabel htmlFor="initiative">Related Initiative</FormLabel>
+            <Select 
+              value={feedback.initiative_id || 'none'} 
+              onValueChange={(value) => handleChange('initiative_id', value)}
+            >
+              <SelectTrigger id="initiative">
+                <SelectValue placeholder="Select initiative..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None (Not related to any initiative)</SelectItem>
+                {initiatives.map((initiative) => (
+                  <SelectItem key={initiative.id} value={initiative.id}>{initiative.title}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FormItem>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>

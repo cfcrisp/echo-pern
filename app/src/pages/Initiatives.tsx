@@ -556,12 +556,18 @@ const Initiatives = () => {
                 <div className="space-y-4">
                   {displayedInitiatives.map((initiative) => (
                     <Card key={initiative.id} 
-                      className={`p-5 hover:shadow-md transition-shadow ${expandedInitiatives[initiative.id] ? 'border-primary/50' : ''}`}
-                      onClick={() => {
-                        setExpandedInitiatives(prev => ({
-                          ...prev,
-                          [initiative.id]: !prev[initiative.id]
-                        }));
+                      className="p-5 hover:shadow-md transition-shadow"
+                      onClick={(e) => {
+                        // If clicking on action buttons, don't trigger row click
+                        if (e.target instanceof Element && 
+                            (e.target.closest('button') || 
+                            e.target.closest('svg') ||
+                            e.target.closest('a'))) {
+                          return;
+                        }
+                        // Find and click the edit button to open the modal
+                        const editBtn = document.getElementById(`edit-initiative-${initiative.id}`);
+                        if (editBtn) editBtn.click();
                       }}
                     >
                       <div className="flex justify-between">
@@ -575,13 +581,6 @@ const Initiatives = () => {
                               {priorityLabels[initiative.priority - 1] || 'Unknown'} Priority
                             </span>
                           </div>
-                          
-                          {/* Description - only shown when expanded */}
-                          {expandedInitiatives[initiative.id] && (
-                            <p className="text-sm text-gray-600 dark:text-gray-300 mb-3 mt-2 pl-2 border-l-2 border-primary/30">
-                              {initiative.description || "No description provided."}
-                            </p>
-                          )}
                           
                           <div className="flex items-center gap-4 text-sm">
                             {/* Linked Goal - Always show (without dropdown) */}
@@ -701,54 +700,8 @@ const Initiatives = () => {
                         
                         <div className="flex flex-col items-end gap-2">
                           <div className="flex items-center space-x-2">
-                            <EditInitiativeModal 
-                              initiative={{
-                                id: initiative.id,
-                                title: initiative.title,
-                                description: initiative.description,
-                                status: initiative.status,
-                                priority: initiative.priority,
-                                goalId: initiative.goal_id
-                              }}
-                              goals={goals}
-                              onUpdate={handleUpdateInitiative}
-                              triggerButtonSize="icon"
-                            />
-                            <div className="relative">
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-8 w-8 p-0"
-                                onClick={(e) => toggleMenu(initiative.id, e)}
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                              
-                              {showMenu[initiative.id] && (
-                                <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded shadow-lg z-10 dark:bg-card dark:border-border">
-                                  <div 
-                                    className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center text-red-600 dark:hover:bg-gray-800/50"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeleteInitiative(initiative.id);
-                                      toggleMenu(initiative.id, e);
-                                    }}
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
-                                  </div>
-                                </div>
-                              )}
-                            </div>
+                            {/* Remove the EditInitiativeModal from here since we have it in the hidden container */}
                           </div>
-                          
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-7 w-7 p-0 rounded-full"
-                            onClick={(e) => toggleExpanded(initiative.id, e)}
-                          >
-                            <ChevronDown className={`h-4 w-4 transition-transform ${expandedInitiatives[initiative.id] ? 'rotate-180' : ''}`} />
-                          </Button>
                         </div>
                       </div>
                     </Card>
@@ -780,12 +733,18 @@ const Initiatives = () => {
                   <div className="space-y-4">
                     {displayedInitiatives.map((initiative) => (
                       <Card key={initiative.id} 
-                        className={`p-5 hover:shadow-md transition-shadow ${expandedInitiatives[initiative.id] ? 'border-primary/50' : ''}`}
-                        onClick={() => {
-                          setExpandedInitiatives(prev => ({
-                            ...prev,
-                            [initiative.id]: !prev[initiative.id]
-                          }));
+                        className="p-5 hover:shadow-md transition-shadow"
+                        onClick={(e) => {
+                          // If clicking on action buttons, don't trigger row click
+                          if (e.target instanceof Element && 
+                              (e.target.closest('button') || 
+                              e.target.closest('svg') ||
+                              e.target.closest('a'))) {
+                            return;
+                          }
+                          // Find and click the edit button to open the modal
+                          const editBtn = document.getElementById(`edit-initiative-${initiative.id}`);
+                          if (editBtn) editBtn.click();
                         }}
                       >
                         <div className="flex justify-between">
@@ -799,13 +758,6 @@ const Initiatives = () => {
                                 {priorityLabels[initiative.priority - 1] || 'Unknown'} Priority
                               </span>
                             </div>
-                            
-                            {/* Description - only shown when expanded */}
-                            {expandedInitiatives[initiative.id] && (
-                              <p className="text-sm text-gray-600 dark:text-gray-300 mb-3 mt-2 pl-2 border-l-2 border-primary/30">
-                                {initiative.description || "No description provided."}
-                              </p>
-                            )}
                             
                             <div className="flex items-center gap-4 text-sm">
                               {/* Linked Goal - Always show (without dropdown) */}
@@ -925,54 +877,8 @@ const Initiatives = () => {
                           
                           <div className="flex flex-col items-end gap-2">
                             <div className="flex items-center space-x-2">
-                              <EditInitiativeModal 
-                                initiative={{
-                                  id: initiative.id,
-                                  title: initiative.title,
-                                  description: initiative.description,
-                                  status: initiative.status,
-                                  priority: initiative.priority,
-                                  goalId: initiative.goal_id
-                                }}
-                                goals={goals}
-                                onUpdate={handleUpdateInitiative}
-                                triggerButtonSize="icon"
-                              />
-                              <div className="relative">
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="h-8 w-8 p-0"
-                                  onClick={(e) => toggleMenu(initiative.id, e)}
-                                >
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                                
-                                {showMenu[initiative.id] && (
-                                  <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded shadow-lg z-10 dark:bg-card dark:border-border">
-                                    <div 
-                                      className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center text-red-600 dark:hover:bg-gray-800/50"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeleteInitiative(initiative.id);
-                                        toggleMenu(initiative.id, e);
-                                      }}
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
+                              {/* Remove the EditInitiativeModal from here since we have it in the hidden container */}
                             </div>
-                            
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="h-7 w-7 p-0 rounded-full"
-                              onClick={(e) => toggleExpanded(initiative.id, e)}
-                            >
-                              <ChevronDown className={`h-4 w-4 transition-transform ${expandedInitiatives[initiative.id] ? 'rotate-180' : ''}`} />
-                            </Button>
                           </div>
                         </div>
                       </Card>
@@ -984,6 +890,37 @@ const Initiatives = () => {
           </Tabs>
         </>
       )}
+
+      {/* Hidden edit modal triggers and buttons */}
+      <div className="hidden">
+        {/* Add hidden buttons */}
+        {displayedInitiatives.map(initiative => (
+          <button 
+            key={`trigger-${initiative.id}`} 
+            id={`edit-initiative-${initiative.id}`}
+            className="hidden"
+          />
+        ))}
+        
+        {/* EditInitiativeModal components */}
+        {displayedInitiatives.map(initiative => (
+          <EditInitiativeModal 
+            key={`hidden-edit-${initiative.id}`}
+            initiative={{
+              id: initiative.id,
+              title: initiative.title,
+              description: initiative.description,
+              status: initiative.status,
+              priority: initiative.priority,
+              goalId: initiative.goal_id
+            }}
+            goals={goals}
+            onUpdate={handleUpdateInitiative}
+            onDelete={handleDeleteInitiative}
+            triggerButtonId={`edit-initiative-${initiative.id}`}
+          />
+        ))}
+      </div>
     </div>
   );
 };

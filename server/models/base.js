@@ -11,6 +11,16 @@ class BaseModel {
     this.pool = pool;
     this.tableName = tableName;
     this.primaryKey = primaryKey;
+    
+    // Fields that should never be directly inserted into any table
+    // These are typically handled through junction tables or other means
+    // For tables that don't have user_id, it should be prevented from insertion
+    this.forbiddenFields = ['customer_ids', 'initiative_ids'];
+    
+    // Add user_id to forbidden fields for tables that don't have this column
+    if (tableName === 'ideas' || tableName === 'goals' || tableName === 'initiatives' || tableName === 'feedback') {
+      this.forbiddenFields.push('user_id');
+    }
   }
 
   /**
@@ -21,6 +31,12 @@ class BaseModel {
   async create(data) {
     // Apply validation and defaults
     const validatedData = await this.validateForCreate(data);
+    
+    // Remove any fields that should not be directly inserted into tables
+    // These are fields handled through junction tables or other mechanisms
+    this.forbiddenFields.forEach(field => {
+      if (validatedData[field]) delete validatedData[field];
+    });
     
     const columns = Object.keys(validatedData);
     const values = Object.values(validatedData);

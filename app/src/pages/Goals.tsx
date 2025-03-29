@@ -114,7 +114,6 @@ const GoalCard: React.FC<{
   linkedInitiatives?: Array<{ id: string; title: string; status: string }>;
 }> = ({ goal, onUpdate, onDelete, linkedInitiatives = [] }) => {
   const statusColor = getStatusColor(goal.status);
-  const [showMenu, setShowMenu] = useState(false);
   const [showInitiatives, setShowInitiatives] = useState(false);
   const navigate = useNavigate();
   
@@ -141,7 +140,21 @@ const GoalCard: React.FC<{
   };
   
   return (
-    <Card className="group transition-all duration-200 hover:shadow-md border border-slate-200 dark:border-gray-700 overflow-hidden dark:bg-card">
+    <Card 
+      className="group transition-all duration-200 hover:shadow-md border border-slate-200 dark:border-gray-700 overflow-hidden dark:bg-card"
+      onClick={(e) => {
+        // If clicking on action buttons, don't trigger row click
+        if (e.target instanceof Element && 
+            (e.target.closest('button') || 
+            e.target.closest('svg') ||
+            e.target.closest('a'))) {
+          return;
+        }
+        // Find and click the edit button to open the modal
+        const editBtn = document.getElementById(`edit-goal-${goal.id}`);
+        if (editBtn) editBtn.click();
+      }}
+    >
       <div className="p-4">
         <div className="flex justify-between items-start">
           <div className="flex-grow">
@@ -154,39 +167,6 @@ const GoalCard: React.FC<{
             <p className="text-sm text-slate-600 dark:text-gray-300 mb-3 line-clamp-2">
               {goal.description}
             </p>
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <EditGoalModal 
-              goal={goal}
-              onUpdate={(updatedGoal) => onUpdate(goal.id, updatedGoal)}
-              triggerButtonSize="icon"
-              initiatives={linkedInitiatives}
-            />
-            <div className="relative">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={() => setShowMenu(!showMenu)}
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-              
-              {showMenu && (
-                <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded shadow-lg z-10 dark:bg-card dark:border-border">
-                  <div 
-                    className="px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer flex items-center text-red-600 dark:hover:bg-gray-800/50"
-                    onClick={() => {
-                      onDelete(goal.id);
-                      setShowMenu(false);
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" /> Delete
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
         </div>
         
@@ -665,6 +645,30 @@ const Goals: React.FC = () => {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Hidden edit modal triggers and buttons */}
+      <div className="hidden">
+        {/* Add hidden buttons */}
+        {goals.map(goal => (
+          <button 
+            key={`trigger-${goal.id}`} 
+            id={`edit-goal-${goal.id}`}
+            className="hidden"
+          />
+        ))}
+        
+        {/* EditGoalModal components */}
+        {goals.map(goal => (
+          <EditGoalModal 
+            key={`hidden-edit-${goal.id}`}
+            goal={goal}
+            onUpdate={(updatedGoal) => handleUpdateGoal(goal.id, updatedGoal)}
+            onDelete={handleDeleteGoal}
+            triggerButtonId={`edit-goal-${goal.id}`}
+            initiatives={getLinkedInitiatives(goal.id)}
+          />
+        ))}
+      </div>
     </div>
   );
 };

@@ -18,10 +18,10 @@ const createEntityHandler = (model, entity, options = {}) => {
       
       // If preprocessor is provided, use it to process the data
       if (options.preprocessor) {
-        processedData = await options.preprocessor(req, processedData);
+        processedData = await options.preprocessor(processedData, req);
       }
       
-      // For feedback entities, handle special fields
+      // Handle special fields for certain entity types
       if (entity === 'feedback') {
         // Handle content field - map to title if title is missing, then remove content
         if (processedData.content && !processedData.title) {
@@ -31,25 +31,22 @@ const createEntityHandler = (model, entity, options = {}) => {
         
         // Store customer/initiative IDs in request object for post-processing
         // Then remove them from processedData to avoid DB errors
-        if (processedData.customer_id) {
-          req.customerId = processedData.customer_id;
-          delete processedData.customer_id;
-        }
-        
-        if (processedData.customer_ids) {
+        ['customer_id', 'customer_ids', 'initiative_id', 'initiative_ids'].forEach(field => {
+          if (processedData[field]) {
+            req[field === 'customer_id' ? 'customerId' : 
+                field === 'customer_ids' ? 'customerIds' : 
+                field === 'initiative_id' ? 'initiativeId' : 'initiativeIds'] = processedData[field];
+            delete processedData[field];
+          }
+        });
+      }
+      // For idea entities, streamlined customer_ids handling 
+      else if (entity === 'ideas' && processedData.customer_ids) {
+        // Store for post-processing if not already handled by preprocessor
+        if (!req.customerIds) {
           req.customerIds = processedData.customer_ids;
-          delete processedData.customer_ids;
         }
-        
-        if (processedData.initiative_id) {
-          req.initiativeId = processedData.initiative_id;
-          delete processedData.initiative_id;
-        }
-        
-        if (processedData.initiative_ids) {
-          req.initiativeIds = processedData.initiative_ids;
-          delete processedData.initiative_ids;
-        }
+        delete processedData.customer_ids;
       }
       
       // Add tenant_id from the authenticated user
@@ -58,11 +55,12 @@ const createEntityHandler = (model, entity, options = {}) => {
       }
       
       // Only add user_id for specific tables that have this column
-      if (['ideas', 'users', 'customers'].includes(entity) && user && user.id) {
+      // The 'ideas' table does not have a user_id column per the database schema
+      if (['users', 'customers'].includes(entity) && user && user.id) {
         processedData.user_id = user.id;
       }
       
-      // Check for required fields and default values
+      // Apply default status for ideas if not set
       if (entity === 'ideas' && !processedData.status) {
         processedData.status = 'new';
       }
@@ -72,7 +70,7 @@ const createEntityHandler = (model, entity, options = {}) => {
       
       // If postprocessor is provided, use it to process the result
       if (options.postprocessor) {
-        await options.postprocessor(req, result);
+        await options.postprocessor(result, req);
       }
       
       // Return the created entity

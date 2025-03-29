@@ -49,7 +49,7 @@ type IdeaModalProps = {
     effort: IdeaEffort;
     status: IdeaStatus;
     initiative_id?: string;
-    customer_ids?: string[];
+    customer_ids: string[];
     source: string;
   }) => void;
   initiatives?: Array<{ id: string; title: string }>;
@@ -82,15 +82,20 @@ export function AddIdeaModal({
   };
 
   const handleCustomerToggle = (customerId: string) => {
+    console.log('Toggling customer:', customerId);
+    console.log('Current customer_ids:', idea.customer_ids);
+    
     setIdea(prev => {
       const currentCustomers = [...prev.customer_ids];
       const index = currentCustomers.indexOf(customerId);
       
       if (index === -1) {
         // Add customer
+        console.log('Adding customer to selection');
         return { ...prev, customer_ids: [...currentCustomers, customerId] };
       } else {
         // Remove customer
+        console.log('Removing customer from selection');
         currentCustomers.splice(index, 1);
         return { ...prev, customer_ids: currentCustomers };
       }
@@ -102,6 +107,7 @@ export function AddIdeaModal({
       ...idea,
       initiative_id: idea.initiative_id === 'none' ? undefined : idea.initiative_id
     };
+    console.log('Submitting idea with customer_ids:', submittedData.customer_ids);
     onSave(submittedData);
     setIdea({
       title: '',
@@ -234,47 +240,28 @@ export function AddIdeaModal({
           )}
           {customers.length > 0 && (
             <FormItem>
-              <FormLabel htmlFor="customers">Related Customers</FormLabel>
-              <Popover open={openCustomerCombobox} onOpenChange={setOpenCustomerCombobox}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={openCustomerCombobox}
-                    className="w-full justify-between"
-                  >
-                    {idea.customer_ids.length > 0
-                      ? `${idea.customer_ids.length} selected`
-                      : "Select customers..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                  <Command>
-                    <CommandInput placeholder="Search customers..." />
-                    <CommandEmpty>No customer found.</CommandEmpty>
-                    <CommandGroup>
-                      <ScrollArea className="h-[200px]">
-                        {customers.map((customer) => (
-                          <CommandItem
-                            key={customer.id}
-                            value={customer.id}
-                            onSelect={() => handleCustomerToggle(customer.id)}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                idea.customer_ids.includes(customer.id) ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                            {customer.name}
-                          </CommandItem>
-                        ))}
-                      </ScrollArea>
-                    </CommandGroup>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+              <FormLabel htmlFor="customer_id">Related Customer</FormLabel>
+              <Select 
+                value={idea.customer_ids.length > 0 ? idea.customer_ids[0] : 'none'} 
+                onValueChange={(value: string) => {
+                  // Handle 'none' selection specially
+                  if (value === 'none') {
+                    handleChange('customer_ids', []);
+                  } else {
+                    handleChange('customer_ids', [value]);
+                  }
+                }}
+              >
+                <SelectTrigger id="customer_id">
+                  <SelectValue placeholder="Select a customer (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {customers.map(customer => (
+                    <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {idea.customer_ids.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1">
                   {idea.customer_ids.map(id => {

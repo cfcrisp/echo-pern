@@ -400,19 +400,32 @@ const Customers = () => {
                     {getSortIcon('feedback_count')}
                   </div>
                 </TableHead>
-                <TableHead className="w-[80px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredCustomers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center">
+                  <TableCell colSpan={5} className="h-24 text-center">
                     No customers found.
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredCustomers.map((customer) => (
-                  <TableRow key={customer.id}>
+                  <TableRow 
+                    key={customer.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={(e) => {
+                      // If clicking on action buttons, don't trigger row click
+                      if (e.target instanceof Element && 
+                          (e.target.closest('button') || 
+                          e.target.closest('svg'))) {
+                        return;
+                      }
+                      // Find and click the edit button
+                      const editBtn = document.getElementById(`edit-customer-${customer.id}`);
+                      if (editBtn) editBtn.click();
+                    }}
+                  >
                     <TableCell className="font-medium">{customer.name}</TableCell>
                     <TableCell>{customer.revenue}</TableCell>
                     <TableCell>
@@ -436,51 +449,6 @@ const Customers = () => {
                         {customer.feedback_count || 0}
                       </Link>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <EditCustomerModal 
-                          customer={customer}
-                          onUpdate={(id, updatedCustomer) => {
-                            console.log('Updating customer with data:', id, updatedCustomer);
-                            handleUpdateCustomer(id, updatedCustomer);
-                          }} 
-                          triggerButtonSize="icon"
-                        />
-                        <div className="relative">
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-7 w-7 p-0"
-                            onClick={() => toggleMenu(customer.id)}
-                          >
-                            <MoreHorizontal className="h-3.5 w-3.5" />
-                          </Button>
-                          
-                          {showMenu[customer.id] && (
-                            <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded shadow-lg z-10 dark:bg-card dark:border-border">
-                              <div 
-                                className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center dark:hover:bg-gray-800/50 dark:text-gray-200"
-                                onClick={() => {
-                                  console.log('View customer details', customer.id);
-                                  toggleMenu(customer.id);
-                                }}
-                              >
-                                <ExternalLink className="h-3.5 w-3.5 mr-2" /> View Details
-                              </div>
-                              <div 
-                                className="px-3 py-2 text-xs hover:bg-gray-100 cursor-pointer flex items-center text-red-600 dark:hover:bg-gray-800/50"
-                                onClick={() => {
-                                  handleDeleteCustomer(customer.id);
-                                  toggleMenu(customer.id);
-                                }}
-                              >
-                                <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -499,6 +467,22 @@ const Customers = () => {
           <p className="text-gray-500 text-center mb-4 dark:text-gray-400">Start adding customers using the Add Customer button in the top right.</p>
         </div>
       )}
+      
+      {/* Hidden edit modal triggers that will be activated programmatically */}
+      <div className="hidden">
+        {customers.map(customer => (
+          <EditCustomerModal 
+            key={`hidden-edit-${customer.id}`}
+            customer={customer}
+            onUpdate={(id, updatedCustomer) => {
+              console.log('Updating customer with data:', id, updatedCustomer);
+              handleUpdateCustomer(id, updatedCustomer);
+            }}
+            onDelete={handleDeleteCustomer}
+            triggerButtonId={`edit-customer-${customer.id}`}
+          />
+        ))}
+      </div>
     </div>
   );
 };

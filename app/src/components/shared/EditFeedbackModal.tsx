@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Pencil } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -28,9 +28,10 @@ export type Feedback = {
   title: string;
   description: string;
   sentiment: Sentiment;
-  customerId?: string;
+  customer_id?: string;
   customer?: string;
-  initiativeId?: string;
+  initiative_id?: string;
+  createdAt?: string;
 };
 
 type Initiative = {
@@ -51,26 +52,30 @@ type EditFeedbackModalProps = {
     title: string;
     description: string;
     sentiment: Sentiment;
-    customerId?: string;
-    initiativeId?: string;
+    customer_id?: string;
+    initiative_id?: string;
   }) => void;
+  onDelete?: (id: string) => void;
   triggerButtonSize?: 'default' | 'sm' | 'lg' | 'icon';
+  triggerButtonId?: string;
 };
 
 export function EditFeedbackModal({ 
   feedback, 
   initiatives, 
   customers, 
-  onUpdate, 
-  triggerButtonSize = 'default' 
+  onUpdate,
+  onDelete,
+  triggerButtonSize = 'default',
+  triggerButtonId
 }: EditFeedbackModalProps) {
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     sentiment: 'neutral' as Sentiment,
-    customerId: '',
-    initiativeId: ''
+    customer_id: '',
+    initiative_id: ''
   });
 
   // Initialize form with feedback data when modal opens
@@ -80,8 +85,8 @@ export function EditFeedbackModal({
         title: feedback.title,
         description: feedback.description,
         sentiment: feedback.sentiment,
-        customerId: feedback.customerId || '',
-        initiativeId: feedback.initiativeId || ''
+        customer_id: feedback.customer_id || '',
+        initiative_id: feedback.initiative_id || ''
       });
     }
   }, [open, feedback]);
@@ -92,26 +97,35 @@ export function EditFeedbackModal({
 
   const handleSubmit = () => {
     console.log('Form data before submission:', formData);
-    console.log('Original customerId:', formData.customerId);
+    console.log('Original customer_id:', formData.customer_id);
     
     // Convert "none" values back to undefined before submission
     const submittedData = {
       ...formData,
-      initiativeId: formData.initiativeId === 'none' ? undefined : formData.initiativeId,
-      customerId: formData.customerId === 'none' ? undefined : formData.customerId
+      initiative_id: formData.initiative_id === 'none' ? undefined : formData.initiative_id,
+      customer_id: formData.customer_id === 'none' ? undefined : formData.customer_id
     };
     
     console.log('Submitted data after processing:', submittedData);
-    console.log('Final customerId value:', submittedData.customerId);
+    console.log('Final customer_id value:', submittedData.customer_id);
     
     onUpdate(feedback.id, submittedData);
     setOpen(false);
   };
 
+  // Handler for dialog open state changes (clicking outside will trigger this)
+  const handleOpenChange = (newOpenState: boolean) => {
+    setOpen(newOpenState);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        {triggerButtonSize === 'icon' ? (
+        {triggerButtonId ? (
+          <Button id={triggerButtonId} variant="ghost" size="sm" className="hidden">
+            Edit
+          </Button>
+        ) : triggerButtonSize === 'icon' ? (
           <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
             <Pencil className="h-4 w-4" />
           </Button>
@@ -122,14 +136,23 @@ export function EditFeedbackModal({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[525px]">
         <DialogHeader>
           <DialogTitle>Edit Feedback</DialogTitle>
-          <DialogDescription>
-            Make changes to the feedback "{feedback.title}".
+          <DialogDescription className="mt-2">
+            <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+              <div>
+                <span className="font-medium">Created:</span> {feedback.createdAt || 'Recently'}
+              </div>
+              {feedback.customer && (
+                <div>
+                  <span className="font-medium">Customer:</span> {feedback.customer}
+                </div>
+              )}
+            </div>
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
+        <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
           <FormItem>
             <FormLabel htmlFor="title">Title</FormLabel>
             <Input 
@@ -167,8 +190,8 @@ export function EditFeedbackModal({
           <FormItem>
             <FormLabel htmlFor="customer">Customer</FormLabel>
             <Select 
-              value={formData.customerId || 'none'} 
-              onValueChange={(value) => handleChange('customerId', value)}
+              value={formData.customer_id || 'none'} 
+              onValueChange={(value) => handleChange('customer_id', value)}
             >
               <SelectTrigger id="customer">
                 <SelectValue placeholder="Select a customer (optional)" />
@@ -176,7 +199,7 @@ export function EditFeedbackModal({
               <SelectContent>
                 <SelectItem value="none">None - General feedback (not customer-specific)</SelectItem>
                 {customers.map(customer => (
-                  <SelectItem key={customer.id} value={customer.id}>{customer.name} (Customer #{customer.id.substring(0, 8)})</SelectItem>
+                  <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -184,8 +207,8 @@ export function EditFeedbackModal({
           <FormItem>
             <FormLabel htmlFor="initiative">Related Initiative</FormLabel>
             <Select 
-              value={formData.initiativeId || 'none'} 
-              onValueChange={(value) => handleChange('initiativeId', value)}
+              value={formData.initiative_id || 'none'} 
+              onValueChange={(value) => handleChange('initiative_id', value)}
             >
               <SelectTrigger id="initiative">
                 <SelectValue placeholder="Select an initiative (optional)" />
@@ -193,15 +216,35 @@ export function EditFeedbackModal({
               <SelectContent>
                 <SelectItem value="none">None - Not related to a specific initiative</SelectItem>
                 {initiatives.map(initiative => (
-                  <SelectItem key={initiative.id} value={initiative.id}>{initiative.title} (Initiative #{initiative.id})</SelectItem>
+                  <SelectItem key={initiative.id} value={initiative.id}>{initiative.title}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </FormItem>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-          <Button onClick={handleSubmit}>Update Feedback</Button>
+        <DialogFooter className="flex items-center justify-between">
+          <div>
+            {onDelete && (
+              <Button 
+                variant="destructive" 
+                size="sm"
+                onClick={() => {
+                  if (window.confirm("Are you sure you want to delete this feedback item? This action cannot be undone.")) {
+                    onDelete(feedback.id);
+                    setOpen(false);
+                  }
+                }}
+                className="mr-auto"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button onClick={handleSubmit}>Update Feedback</Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
