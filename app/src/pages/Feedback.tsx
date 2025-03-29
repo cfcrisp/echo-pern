@@ -240,87 +240,97 @@ const Feedback = () => {
     initiative_id?: string;
   }) => {
     try {
-      // Title validation is already done in AddFeedbackModal
+      // Validate title
+      const trimmedTitle = feedbackItem.title.trim();
+      if (!trimmedTitle) {
+        alert('Title cannot be empty');
+        return;
+      }
+      
       setLoading(true);
       
-      const trimmedTitle = feedbackItem.title.trim();
+      // Get auth token from any available storage location
+      const token = localStorage.getItem('authToken') || 
+                   localStorage.getItem('jwt') || 
+                   sessionStorage.getItem('authToken') || 
+                   sessionStorage.getItem('jwt') || '';
       
-      // Create the API payload matching exactly what the API client expects
-      const apiPayload = {
-        // The API expects 'content', not 'title' (in the API client)
-        content: trimmedTitle,
-        // This is required by the API client type definition
-        customer_id: feedbackItem.customer_id || '',
-        // Optional fields
+      // Create feedback payload with server-expected structure
+      const payload = {
+        title: trimmedTitle,
+        content: trimmedTitle, // Include both to ensure it's received
+        description: feedbackItem.description,
         sentiment: feedbackItem.sentiment,
-        source: 'manual'
+        tenant_id: user?.tenant_id || ''
       };
       
-      console.log('Sending feedback to API:', JSON.stringify(apiPayload, null, 2));
+      // Create URL with query parameters for customer_id and initiative_id
+      const url = new URL('http://localhost:3000/feedback');
       
-      try {
-        // Will be processed by the server to extract title from content if needed
-        const newFeedback = await apiClient.feedback.create(apiPayload);
-        console.log('API response:', newFeedback);
-        
-        if (!newFeedback || !newFeedback.id) {
-          throw new Error('API returned invalid feedback data');
-        }
-        
-        // Now handle initiative associations separately if needed
-        if ((feedbackItem.initiative_id || feedbackItem.initiative_ids?.length) && newFeedback.id) {
-          try {
-            // Update the feedback with initiative data
-            const initiativeUpdate: {
-              initiative_id?: string;
-              initiative_ids?: string[];
-            } = {};
-            
-            if (feedbackItem.initiative_id) {
-              initiativeUpdate.initiative_id = feedbackItem.initiative_id;
-            }
-            
-            if (feedbackItem.initiative_ids?.length) {
-              initiativeUpdate.initiative_ids = feedbackItem.initiative_ids;
-            }
-            
-            await apiClient.feedback.update(newFeedback.id, initiativeUpdate);
-          } catch (initiativeError) {
-            console.error('Failed to associate initiative with feedback:', initiativeError);
-            // Continue even if initiative association fails
-          }
-        }
-        
-        // Find customer name for the new feedback
-        const customerName = feedbackItem.customer_id
-          ? customers.find(c => c.id === feedbackItem.customer_id)?.name || 'Unknown'
-          : 'Unknown';
-          
-        // Update the local state with the new formatted feedback
-        setFeedback(prevFeedback => [
-          ...prevFeedback, 
-          formatFeedbackData({
-            ...newFeedback,
-            id: newFeedback.id,
-            title: trimmedTitle, // Ensure title is preserved locally
-            description: feedbackItem.description || '',
-            sentiment: feedbackItem.sentiment,
-            customer_id: feedbackItem.customer_id,
-            customer_name: customerName
-          })
-        ]);
-        
-        // Show success message to provide user feedback
-        alert('Feedback saved successfully!');
-        
-      } catch (apiError: unknown) {
-        console.error('API Error:', apiError);
-        const errorMessage = apiError instanceof Error ? apiError.message : 'Failed to create feedback';
-        throw new Error(`API Error: ${errorMessage}`);
+      // Add customer_id as query parameter if provided and not 'none'
+      if (feedbackItem.customer_id && feedbackItem.customer_id !== 'none') {
+        url.searchParams.append('customer_id', feedbackItem.customer_id);
       }
-    } catch (err: any) {
-      console.error('Error creating feedback:', err);
-      alert('Failed to create feedback: ' + (err.message || 'Please try again.'));
+      
+      // Add initiative_id as query parameter if provided and not 'none'
+      if (feedbackItem.initiative_id && feedbackItem.initiative_id !== 'none') {
+        url.searchParams.append('initiative_id', feedbackItem.initiative_id);
+      }
+      
+      // Make direct fetch request with auth headers
+      const response = await fetch(url.toString(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+          'X-Tenant-ID': user?.tenant_id || '',
+        },
+        body: JSON.stringify(payload),
+        credentials: 'include',
+      });
+      
+      // Handle error responses
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          throw new Error(`Server error: ${response.status} - ${errorText}`);
+        }
+        throw new Error(errorData.error || `Server error: ${response.status}`);
+      }
+      
+      // Parse successful response
+      const data = await response.json();
+      
+      // Check if we got an ID back
+      if (!data.id) {
+        throw new Error('Failed to create feedback: No ID returned');
+      }
+      
+      // Get the complete feedback data using the ID
+      const newFeedback = await apiClient.feedback.getById(data.id);
+      
+      // Ensure customer information is included
+      const customerName = feedbackItem.customer_id && feedbackItem.customer_id !== 'none'
+        ? customers.find(c => c.id === feedbackItem.customer_id)?.name || 'Unknown'
+        : 'Unknown';
+        
+      // Add customer data to the feedback if not already present
+      if (!newFeedback.customer_name && feedbackItem.customer_id && feedbackItem.customer_id !== 'none') {
+        newFeedback.customer_name = customerName;
+        newFeedback.customer_id = feedbackItem.customer_id;
+      }
+      
+      // Format and add to state
+      const formattedFeedback = formatFeedbackData(newFeedback);
+      setFeedback(prev => [formattedFeedback, ...prev]);
+      
+      // Remove success alert
+    } catch (error) {
+      console.error('Error creating feedback:', error);
+      alert(`Failed to create feedback: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -375,17 +385,10 @@ const Feedback = () => {
       
       setLoading(true);
       
-      // Create API-compatible update object
-      const apiUpdate: any = {};
+      // Create API-compatible update object with only defined fields
+      const apiUpdate: Record<string, any> = {};
       
-      // Handle title/description update
-      if (updatedFeedback.title || updatedFeedback.description) {
-        const title = updatedFeedback.title || existingFeedback.title;
-        const description = updatedFeedback.description || existingFeedback.description;
-        apiUpdate.content = `${title}: ${description}`;
-      }
-      
-      // Better approach: Send title and description separately
+      // Only add fields that were provided in the update
       if (updatedFeedback.title !== undefined) {
         apiUpdate.title = updatedFeedback.title;
       }
@@ -394,23 +397,18 @@ const Feedback = () => {
         apiUpdate.description = updatedFeedback.description;
       }
       
-      // Handle sentiment update
-      if (updatedFeedback.sentiment) {
+      if (updatedFeedback.sentiment !== undefined) {
         apiUpdate.sentiment = updatedFeedback.sentiment;
       }
       
-      // Handle customer_id update
-      if (customer_id !== undefined) {
-        apiUpdate.customer_id = customer_id;
+      // Handle customer_id, using null to clear the association if explicitly set to undefined
+      if ('customer_id' in updatedFeedback || 'customerId' in updatedFeedback) {
+        apiUpdate.customer_id = customer_id === 'none' ? null : customer_id;
       }
       
-      // Handle initiative_id update
-      if (initiative_id !== undefined) {
-        apiUpdate.initiative_id = initiative_id;
-      } else if ('initiative_id' in updatedFeedback || 'initiativeId' in updatedFeedback) {
-        // If initiative_id is explicitly set to undefined (selected 'none' in UI),
-        // set it to null to clear the association
-        apiUpdate.initiative_id = null;
+      // Handle initiative_id, using null to clear the association if explicitly set to undefined
+      if ('initiative_id' in updatedFeedback || 'initiativeId' in updatedFeedback) {
+        apiUpdate.initiative_id = initiative_id === 'none' ? null : initiative_id;
       }
       
       // Update feedback via API
@@ -422,8 +420,6 @@ const Feedback = () => {
       // Format and update the feedback in state
       const formattedFeedback = formatFeedbackData({
         ...refreshedFeedback,
-        title: updatedFeedback.title || refreshedFeedback.title,
-        // Explicitly pass known customer data if we have it
         customer_id: refreshedFeedback.customer_id || customer_id,
         customer_name: customerName
       });
@@ -432,23 +428,27 @@ const Feedback = () => {
       setFeedback(prevFeedback => prevFeedback.map(item => 
         item.id === id ? formattedFeedback : item
       ));
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error updating feedback:', err);
       alert('Failed to update feedback. Please try again.');
       
-      // If API update fails, revert to original state by re-fetching
-      try {
-        const feedbackData = await apiClient.feedback.getAll();
-        // Make sure to format each feedback item consistently
-        const formattedData = Array.isArray(feedbackData) 
-          ? feedbackData.map(item => formatFeedbackData(item)) 
-          : [];
-        setFeedback(formattedData);
-      } catch (refreshErr) {
-        console.error('Error refreshing feedback after failed update:', refreshErr);
-      }
+      // Refresh the data on error to ensure UI is consistent
+      refreshFeedbackData();
     } finally {
       setLoading(false);
+    }
+  };
+  
+  // Helper to refresh feedback data after errors
+  const refreshFeedbackData = async () => {
+    try {
+      const feedbackData = await apiClient.feedback.getAll();
+      const formattedData = Array.isArray(feedbackData) 
+        ? feedbackData.map(item => formatFeedbackData(item)) 
+        : [];
+      setFeedback(formattedData);
+    } catch (refreshErr) {
+      console.error('Error refreshing feedback data:', refreshErr);
     }
   };
 

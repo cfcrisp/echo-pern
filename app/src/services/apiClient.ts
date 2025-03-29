@@ -648,15 +648,28 @@ export const feedbackApi = {
     source?: string;
   }) => {
     try {
+      // Add title field explicitly since that's what the server validates against
+      const enhancedData = {
+        ...feedbackData,
+        title: feedbackData.content // Copy content to title to ensure it passes validation
+      };
+      
+      console.log('Enhanced feedback payload:', enhancedData);
+      
       return await fetchWithAuth('/feedback', {
         method: 'POST',
-        body: JSON.stringify(feedbackData),
+        body: JSON.stringify(enhancedData),
       });
     } catch (error) {
       console.error('Feedback creation failed with proxy. Trying direct server access...');
+      // Also ensure title is set for direct server access
+      const enhancedData = {
+        ...feedbackData,
+        title: feedbackData.content
+      };
       return tryDirectServerAccess('/feedback', {
         method: 'POST',
-        body: JSON.stringify(feedbackData),
+        body: JSON.stringify(enhancedData),
       });
     }
   },

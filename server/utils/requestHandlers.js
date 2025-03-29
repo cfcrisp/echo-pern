@@ -14,34 +14,24 @@ const createEntityHandler = (model, entity, options = {}) => {
     try {
       const { body, user } = req;
       
+      console.log(`📝 CREATE HANDLER - Request to create ${entity}`);
+      console.log(`🔑 CREATE HANDLER - Authenticated user:`, user ? `ID: ${user.id}, Tenant: ${user.tenant_id}` : 'No user');
+      console.log(`📨 CREATE HANDLER - Request headers:`, {
+        'content-type': req.headers['content-type'],
+        'authorization': req.headers.authorization ? 'Present' : 'Missing',
+        'x-tenant-id': req.headers['x-tenant-id'] || 'Missing'
+      });
+      
       let processedData = { ...body };
       
       // If preprocessor is provided, use it to process the data
       if (options.preprocessor) {
+        console.log(`🔄 CREATE HANDLER - Calling custom preprocessor for ${entity}`);
         processedData = await options.preprocessor(processedData, req);
       }
       
-      // Handle special fields for certain entity types
-      if (entity === 'feedback') {
-        // Handle content field - map to title if title is missing, then remove content
-        if (processedData.content && !processedData.title) {
-          processedData.title = processedData.content;
-        }
-        delete processedData.content;
-        
-        // Store customer/initiative IDs in request object for post-processing
-        // Then remove them from processedData to avoid DB errors
-        ['customer_id', 'customer_ids', 'initiative_id', 'initiative_ids'].forEach(field => {
-          if (processedData[field]) {
-            req[field === 'customer_id' ? 'customerId' : 
-                field === 'customer_ids' ? 'customerIds' : 
-                field === 'initiative_id' ? 'initiativeId' : 'initiativeIds'] = processedData[field];
-            delete processedData[field];
-          }
-        });
-      }
       // For idea entities, streamlined customer_ids handling 
-      else if (entity === 'ideas' && processedData.customer_ids) {
+      if (entity === 'ideas' && processedData.customer_ids) {
         // Store for post-processing if not already handled by preprocessor
         if (!req.customerIds) {
           req.customerIds = processedData.customer_ids;
@@ -52,6 +42,9 @@ const createEntityHandler = (model, entity, options = {}) => {
       // Add tenant_id from the authenticated user
       if (user && user.tenant_id) {
         processedData.tenant_id = user.tenant_id;
+        console.log(`👤 CREATE HANDLER - Set tenant_id from user: ${processedData.tenant_id}`);
+      } else {
+        console.log(`⚠️ CREATE HANDLER - No authenticated user or tenant_id available`);
       }
       
       // Only add user_id for specific tables that have this column
@@ -65,18 +58,29 @@ const createEntityHandler = (model, entity, options = {}) => {
         processedData.status = 'new';
       }
       
+      console.log(`✅ CREATE HANDLER - Final data to create:`, JSON.stringify(processedData));
+      
       // Validate and create the entity
+      console.log(`💾 CREATE HANDLER - Attempting to create ${entity} in database`);
       const result = await model.create(processedData);
+      
+      if (result) {
+        console.log(`✅ CREATE HANDLER - Successfully created ${entity} with ID: ${result.id}`);
+      } else {
+        console.log(`⚠️ CREATE HANDLER - Created ${entity} but no result returned`);
+      }
       
       // If postprocessor is provided, use it to process the result
       if (options.postprocessor) {
+        console.log(`🔄 CREATE HANDLER - Calling postprocessor for ${entity}`);
         await options.postprocessor(result, req);
       }
       
       // Return the created entity
       return res.status(201).json(result);
     } catch (error) {
-      console.error(`Error creating ${entity}:`, error);
+      console.error(`❌ CREATE HANDLER - Error creating ${entity}:`, error);
+      console.error(`❌ CREATE HANDLER - Error stack:`, error.stack);
       return res.status(500).json({ error: `Server error: ${error.message}` });
     }
   };
@@ -100,19 +104,15 @@ const listEntityHandler = (model, listMethod = 'findByTenant', options = {}) => 
   
   return async (req, res) => {
     try {
-      console.log(`listEntityHandler called for model: ${model.tableName}, method: ${listMethod}`);
-      
       // Get tenant ID, either from authenticated user or request
       let tenantId = null;
       if (req.user && req.user.tenant_id) {
         tenantId = req.user.tenant_id;
-        console.log(`Tenant ID from user: ${tenantId}`);
       } else {
         // Try to extract tenant ID from request
         try {
           const { extractTenantId } = require('../middleware/tenant');
           tenantId = extractTenantId(req);
-          console.log(`Tenant ID extracted from request: ${tenantId}`);
         } catch (err) {
           console.error('Error extracting tenant ID:', err);
         }
@@ -121,15 +121,11 @@ const listEntityHandler = (model, listMethod = 'findByTenant', options = {}) => 
       // Also check for tenant ID directly on request (may be set by middleware)
       if (!tenantId && req.tenantId) {
         tenantId = req.tenantId;
-        console.log(`Using tenantId from request object: ${tenantId}`);
       }
       
       if (!tenantId) {
-        console.log('No tenant ID found, returning empty array');
         return res.json([]);
       }
-      
-      console.log(`Fetching ${model.tableName} for tenant: ${tenantId}`);
       
       // Parse query parameters for filtering
       const filters = {};
@@ -161,13 +157,6 @@ const listEntityHandler = (model, listMethod = 'findByTenant', options = {}) => 
       const limit = parseInt(req.query.limit, 10) || 50;
       const offset = (page - 1) * limit;
       
-      console.log('Query parameters processed:');
-      console.log('- Filters:', filters);
-      console.log('- Sort:', sort);
-      console.log('- Order:', order);
-      console.log('- Limit:', limit);
-      console.log('- Offset:', offset);
-      
       // Call the appropriate list method
       let entities;
       const queryOptions = { 
@@ -182,79 +171,62 @@ const listEntityHandler = (model, listMethod = 'findByTenant', options = {}) => 
         // Handle the default case
         if (model.findByTenantWithOptions && typeof model.findByTenantWithOptions === 'function') {
           // If the model supports advanced options
-          console.log('Using findByTenantWithOptions method');
           entities = await model.findByTenantWithOptions(tenantId, queryOptions);
         } else {
           // Fallback to basic method with just status filter
-          console.log('Using basic findByTenant method');
           entities = await model.findByTenant(tenantId, filters.status || null);
         }
       } else if (typeof model[listMethod] === 'function') {
         // Call custom method
-        console.log(`Using custom method: ${listMethod}`);
         entities = await model[listMethod](tenantId, queryOptions);
       } else {
         throw new Error(`Method ${listMethod} not found on model ${model.tableName}`);
       }
       
-      console.log(`Retrieved ${entities ? entities.length : 0} ${model.tableName}`);
-      
       // Apply any post-processing
       if (postProcess) {
-        console.log('Applying post-processing');
         entities = await postProcess(entities, req);
       }
       
-      res.json(entities || []);
+      // Return the entities
+      return res.json(entities);
     } catch (error) {
-      console.error(`Error in listEntityHandler for ${model.tableName}:`, error);
-      console.error('Stack trace:', error.stack);
-      res.status(500).json({ 
-        error: `Server error listing ${model.tableName}`, 
-        details: error.message,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      });
+      console.error(`Error listing ${model.tableName}:`, error);
+      return res.status(500).json({ error: `Server error: ${error.message}` });
     }
   };
 };
 
 /**
- * Factory function to create a standardized get entity by ID handler
+ * Factory function to create a standardized entity get-by-id handler
  * @param {Object} model - The model instance to use
- * @param {Function} postProcess - Optional function to process data after fetching
+ * @param {Function} postProcess - Optional function to post-process the entity
  * @returns {Function} Express request handler
  */
 const getEntityByIdHandler = (model, postProcess = null) => {
   return async (req, res) => {
     try {
-      const id = req.params.id;
+      const { id } = req.params;
       
-      if (!id) {
-        return res.status(400).json({ error: 'ID parameter is required' });
-      }
-      
-      console.log(`GET /${model.tableName}/${id} request received`);
-      
-      // Get the entity
+      // Get entity by ID
       const entity = await model.findById(id);
       
+      // Check if entity exists
       if (!entity) {
-        return res.status(404).json({ error: `${model.tableName.slice(0, -1)} not found` });
+        return res.status(404).json({ error: `${model.tableName} not found` });
       }
       
-      // Apply any post-processing if provided
+      // Apply any post-processing
+      let processedEntity = entity;
       if (postProcess) {
-        const processedEntity = await postProcess(entity, req);
-        return res.json(processedEntity);
+        processedEntity = await postProcess(entity);
       }
       
-      res.json(entity);
+      // Return the entity
+      return res.json(processedEntity);
     } catch (error) {
-      console.error(`Error getting ${model.tableName} by ID:`, error.message);
-      res.status(500).json({ 
-        error: `Server error getting ${model.tableName} by ID`, 
-        details: error.message 
-      });
+      console.error(`Error getting ${model.tableName} by ID:`, error);
+      return res.status(500).json({ error: `Server error: ${error.message}` });
     }
   };
 };

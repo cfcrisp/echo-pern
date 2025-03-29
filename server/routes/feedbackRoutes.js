@@ -22,10 +22,6 @@ const processFeedbackComments = async (feedback) => {
     // Get associated initiatives
     const initiatives = await feedbackModel.getInitiatives(feedback.id);
     
-    console.log('DEBUG: processFeedbackComments for feedback ID:', feedback.id);
-    console.log('DEBUG: Found customers:', customers.length);
-    console.log('DEBUG: Found initiatives:', initiatives.length);
-    
     // Get comments
     const comments = await commentModel.findByEntity('feedback', feedback.id);
     
@@ -68,52 +64,43 @@ router.get('/:id', authenticate, authorizeFeedbackAccess, getEntityByIdHandler(
 ));
 
 // Pre-process feedback data before creation
-const preprocessFeedback = async (req, data) => {
-  // Ensure tenant ID is set
-  if (req.user && req.user.tenant_id) {
-    data.tenant_id = req.user.tenant_id;
-  }
-
-  // Handle content/title relationship
+const preprocessFeedback = async (data, req) => {
+  // Handle content/title relationship - ensure title exists
   if (data.content && !data.title) {
     data.title = data.content;
   }
-  delete data.content;
-
-  // Store customer/initiative IDs for post-processing
-  if (data.customer_id) {
-    req.customerId = data.customer_id;
-    delete data.customer_id;
+  
+  // Don't delete content until we're sure title exists
+  if (data.title) {
+    delete data.content;
   }
 
-  if (data.customer_ids) {
-    req.customerIds = data.customer_ids;
-    delete data.customer_ids;
-  }
+  // Extract relationship IDs from request to be handled after creation
+  // First check data object, then fallback to query parameters
+  ['customer_id', 'customer_ids', 'initiative_id', 'initiative_ids'].forEach(field => {
+    const reqField = field === 'customer_id' ? 'customerId' : 
+                    field === 'customer_ids' ? 'customerIds' : 
+                    field === 'initiative_id' ? 'initiativeId' : 'initiativeIds';
+                    
+    if (data[field]) {
+      req[reqField] = data[field];
+      delete data[field];
+    } else if (req.query[field]) {
+      req[reqField] = req.query[field];
+    }
+  });
 
-  if (data.initiative_id) {
-    req.initiativeId = data.initiative_id;
-    delete data.initiative_id;
-  }
-
-  if (data.initiative_ids) {
-    req.initiativeIds = data.initiative_ids;
-    delete data.initiative_ids;
-  }
-
-  // Only allow specific fields
-  const validFeedbackData = {
+  // Return only valid feedback fields
+  return {
     title: data.title,
     description: data.description || null,
     sentiment: data.sentiment || null,
     tenant_id: data.tenant_id
   };
-
-  return validFeedbackData;
 };
 
 // Post-process feedback after creation
-const postProcessFeedbackCreate = async (req, feedback) => {
+const postProcessFeedbackCreate = async (feedback, req) => {
   try {
     // Handle customer associations
     if (req.customerId) {
@@ -234,21 +221,15 @@ router.put('/:id', authenticate, authorizeFeedbackAccess, async (req, res) => {
     // Handle initiative associations if provided
     if (initiative_id || (initiative_ids && Array.isArray(initiative_ids))) {
       try {
-        console.log('DEBUG: Processing initiative associations');
-        console.log('DEBUG: initiative_id:', initiative_id);
-        console.log('DEBUG: initiative_ids:', initiative_ids);
-        
         // Remove existing initiative associations
         await feedbackModel.removeAllInitiatives(id);
         
         // Add new initiative associations
         if (initiative_id) {
-          console.log('DEBUG: Adding single initiative with ID:', initiative_id);
           await feedbackModel.addInitiative(id, initiative_id);
         }
         
         if (initiative_ids && Array.isArray(initiative_ids)) {
-          console.log('DEBUG: Adding multiple initiatives:', initiative_ids);
           for (const iId of initiative_ids) {
             await feedbackModel.addInitiative(id, iId);
           }
@@ -257,8 +238,6 @@ router.put('/:id', authenticate, authorizeFeedbackAccess, async (req, res) => {
         console.error('Error updating initiative associations:', error);
         // Continue processing even if this part fails
       }
-    } else {
-      console.log('DEBUG: No initiative data provided in update');
     }
     
     // Return updated feedback with full details
