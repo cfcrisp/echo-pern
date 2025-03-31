@@ -139,18 +139,19 @@ export function EditFeedbackModal({
       <DialogContent className="sm:max-w-[525px]">
         <DialogHeader>
           <DialogTitle>Edit Feedback</DialogTitle>
-          <DialogDescription className="mt-2">
-            <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-              <div>
-                <span className="font-medium">Created:</span> {feedback.createdAt || 'Recently'}
-              </div>
-              {feedback.customer && (
-                <div>
-                  <span className="font-medium">Customer:</span> {feedback.customer}
-                </div>
-              )}
-            </div>
+          <DialogDescription>
+            Make changes to the feedback details below.
           </DialogDescription>
+          <div className="flex flex-wrap gap-3 mt-2 text-xs text-muted-foreground">
+            <div>
+              <span className="font-medium">Created:</span> {feedback.createdAt || 'Recently'}
+            </div>
+            {feedback.customer && (
+              <div>
+                <span className="font-medium">Customer:</span> {feedback.customer}
+              </div>
+            )}
+          </div>
         </DialogHeader>
         <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
           <FormItem>
@@ -229,10 +230,8 @@ export function EditFeedbackModal({
                 variant="destructive" 
                 size="sm"
                 onClick={() => {
-                  if (window.confirm("Are you sure you want to delete this feedback item? This action cannot be undone.")) {
-                    onDelete(feedback.id);
-                    setOpen(false);
-                  }
+                  onDelete(feedback.id);
+                  setOpen(false);
                 }}
                 className="mr-auto"
               >

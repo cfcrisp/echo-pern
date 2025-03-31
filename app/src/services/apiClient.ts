@@ -146,7 +146,20 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
       throw new Error(errorMessage);
     }
     
-    return await response.json();
+    // For DELETE operations that return 204 No Content or empty responses, don't try to parse JSON
+    if (options.method === 'DELETE' && 
+        (response.status === 204 || response.headers.get('Content-Length') === '0')) {
+      return { success: true, message: 'Resource deleted successfully' };
+    }
+    
+    // For all other successful responses, try to parse JSON
+    try {
+      return await response.json();
+    } catch (parseError) {
+      // If we can't parse JSON but the request was successful, return a success object
+      console.log(`Response couldn't be parsed as JSON, but request was successful:`, parseError);
+      return { success: true };
+    }
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
       console.error(`API request failed: ${endpoint}`, error);
@@ -199,6 +212,23 @@ const tryDirectServerAccess = async (endpoint: string, options: RequestInit) => 
       // Include credentials to ensure cookies are sent
       credentials: 'include',
     });
+    
+    // For DELETE operations, 404 means the resource is already gone, which is fine
+    if (response.status === 404 && options.method === 'DELETE') {
+      // Extract resource type from endpoint (e.g., /goals/123 -> 'goal')
+      const parts = endpoint.split('/');
+      // Get the resource type (removing trailing 's')
+      const resourceType = parts[1].endsWith('s') 
+        ? parts[1].substring(0, parts[1].length - 1) 
+        : parts[1];
+      
+      console.log(`${resourceType.charAt(0).toUpperCase() + resourceType.slice(1)} with ID ${parts[2]} not found (404), considering it already deleted`);
+      
+      return { 
+        success: true, 
+        message: `${resourceType.charAt(0).toUpperCase() + resourceType.slice(1)} not found or already deleted` 
+      };
+    }
     
     if (!response.ok) {
       const errorText = await response.text();
@@ -390,14 +420,53 @@ export const goalsApi = {
    */
   delete: async (id: string) => {
     try {
-      return await fetchWithAuth(`/goals/${id}`, {
+      // Attempt deletion via proxy API
+      console.log(`Attempting to delete goal via proxy: ${id}`);
+      const response = await fetchWithAuth(`/goals/${id}`, {
         method: 'DELETE',
       });
+      return response;
     } catch (error) {
-      console.error('Goal deletion failed with proxy. Trying direct server access...');
-      return tryDirectServerAccess(`/goals/${id}`, {
-        method: 'DELETE',
-      });
+      // If we get a SyntaxError, it's likely because the server returned a 204 No Content
+      // or an empty response, which is actually successful for deletion
+      if (error instanceof SyntaxError) {
+        console.log(`SyntaxError when deleting goal ${id}, but this is likely a successful deletion with no content returned`);
+        return { success: true, message: 'Goal successfully deleted (empty response)' };
+      }
+      
+      console.error('Goal deletion failed with proxy:', error);
+      
+      // For other errors, try direct server access
+      try {
+        console.log(`Attempting direct server access for goal deletion: ${id}`);
+        const directResult = await tryDirectServerAccess(`/goals/${id}`, {
+          method: 'DELETE',
+        });
+        
+        // Check if the response indicates the goal was not found
+        if (directResult && directResult.error) {
+          if (directResult.error.includes('not found') || directResult.error.includes('404')) {
+            console.log(`Goal ${id} not found (404), considering it already deleted`);
+            return { success: true, message: "Goal not found or already deleted" };
+          }
+          console.error('Error from direct server access:', directResult.error);
+        }
+        
+        return directResult;
+      } catch (directError) {
+        console.error('Error during direct server access:', directError);
+        
+        // Consider any 404 error as a successful deletion
+        const errorObj = directError as { status?: number; message?: string };
+        if (errorObj && 
+            (errorObj.status === 404 || 
+             (errorObj.message && errorObj.message.includes('404')))) {
+          console.log(`Goal ${id} not found (404 from error), considering it already deleted`);
+          return { success: true, message: "Goal not found or already deleted" };
+        }
+        
+        throw directError;
+      }
     }
   },
 };
@@ -540,21 +609,30 @@ export const customersApi = {
    */
   create: async (customerData: {
     name: string;
-    email: string;
-    company?: string;
     status: 'active' | 'inactive';
+    revenue?: string;
   }) => {
     try {
-      return await fetchWithAuth('/customers', {
+      console.log('Creating customer with data:', customerData);
+      const response = await fetchWithAuth('/customers', {
         method: 'POST',
         body: JSON.stringify(customerData),
       });
+      console.log('API response for customer creation:', response);
+      return response;
     } catch (error) {
-      console.error('Customer creation failed with proxy. Trying direct server access...');
-      return tryDirectServerAccess('/customers', {
-        method: 'POST',
-        body: JSON.stringify(customerData),
-      });
+      console.error('Customer creation failed with proxy. Trying direct server access...', error);
+      try {
+        const directResponse = await tryDirectServerAccess('/customers', {
+          method: 'POST',
+          body: JSON.stringify(customerData),
+        });
+        console.log('Direct API response for customer creation:', directResponse);
+        return directResponse;
+      } catch (directError) {
+        console.error('Direct server access also failed:', directError);
+        throw directError;
+      }
     }
   },
   
@@ -563,8 +641,7 @@ export const customersApi = {
    */
   update: async (id: string, customerData: {
     name?: string;
-    email?: string;
-    company?: string;
+    revenue?: string;
     status?: 'active' | 'inactive';
   }) => {
     try {

@@ -43,8 +43,6 @@ type Customer = {
   createdAt: string;
   ideas?: CustomerIdea[];
   feedback?: CustomerFeedback[];
-  email?: string;
-  company?: string;
 };
 
 // Customers Component
@@ -66,19 +64,38 @@ const Customers = () => {
         const data = await apiClient.customers.getAll();
         
         // Format the data to match our Customer type if needed
-        const formattedData = Array.isArray(data) ? data.map((customer: any) => ({
-          id: customer.id || '',
-          name: customer.name || '',
-          email: customer.email || '',  // Ensure email is never undefined
-          company: customer.company || '',  // Ensure company is never undefined
-          revenue: customer.revenue || '$0',
-          status: customer.status || 'active',
-          idea_count: customer.idea_count || 0,
-          feedback_count: customer.feedback_count || 0,
-          createdAt: customer.created_at || 'Recently',
-          ideas: customer.ideas || [],
-          feedback: customer.feedback || []
-        })) : [];
+        const formattedData = Array.isArray(data) ? data.map((customer: any) => {
+          // Format revenue consistently with dollar sign and commas
+          let formattedRevenue = customer.revenue || '0';
+          if (typeof formattedRevenue === 'number') {
+            formattedRevenue = `$${formattedRevenue.toLocaleString('en-US', {
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 0
+            })}`;
+          } else if (typeof formattedRevenue === 'string' && !formattedRevenue.startsWith('$')) {
+            const numericValue = parseFloat(formattedRevenue.replace(/[^0-9.-]/g, ''));
+            if (!isNaN(numericValue)) {
+              formattedRevenue = `$${numericValue.toLocaleString('en-US', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+              })}`;
+            } else {
+              formattedRevenue = '$0';
+            }
+          }
+          
+          return {
+            id: customer.id || '',
+            name: customer.name || '',
+            revenue: formattedRevenue,
+            status: customer.status || 'active',
+            idea_count: customer.idea_count || 0,
+            feedback_count: customer.feedback_count || 0,
+            createdAt: customer.created_at || 'Recently',
+            ideas: customer.ideas || [],
+            feedback: customer.feedback || []
+          };
+        }) : [];
         
         console.log('Formatted customer data:', formattedData);
         setCustomers(formattedData);
@@ -128,8 +145,7 @@ const Customers = () => {
   // Create a new customer
   const handleSaveCustomer = async (customer: {
     name: string;
-    email: string;
-    company?: string;
+    revenue?: string;
     status: CustomerStatus;
   }) => {
     try {
@@ -140,22 +156,32 @@ const Customers = () => {
         customer.status === 'prospect' ? 'active' : 
         (customer.status as 'active' | 'inactive');
       
-      // Create the new customer via API
+      // Create the new customer via API with all relevant fields
       const newCustomer = await apiClient.customers.create({
-        ...customer,
-        status: apiStatus
+        name: customer.name,
+        status: apiStatus,
+        revenue: customer.revenue // Send revenue to the API
       });
       
+      console.log('Customer created successfully:', newCustomer);
+      console.log('Original form data (with revenue & status):', customer);
+
       // Update the local state with the new customer
-      setCustomers(prevCustomers => [...prevCustomers, {
-        ...newCustomer,
-        revenue: '$0',
-        idea_count: 0,
-        feedback_count: 0,
-        createdAt: 'Just now',
-        ideas: [],
-        feedback: []
-      }]);
+      // Include revenue and status from the form, since API might not return these
+      setCustomers(prevCustomers => [
+        ...prevCustomers, 
+        {
+          ...newCustomer,
+          name: customer.name, // Use form data name in case API response is incomplete
+          revenue: formatRevenue(customer.revenue), // Format the revenue properly
+          status: customer.status, // Use the status from the form
+          idea_count: 0,
+          feedback_count: 0,
+          createdAt: 'Just now',
+          ideas: [],
+          feedback: []
+        }
+      ]);
     } catch (err) {
       console.error('Error creating customer:', err);
       alert('Failed to create customer. Please try again.');
@@ -191,7 +217,7 @@ const Customers = () => {
           return { 
             ...customer, 
             name: updatedCustomer.name,
-            revenue: updatedCustomer.revenue,
+            revenue: formatRevenue(updatedCustomer.revenue),
             status: updatedCustomer.status
           };
         }
@@ -206,16 +232,14 @@ const Customers = () => {
       console.log('Making API call to update customer with:', {
         name: updatedCustomer.name,
         status: apiStatus,
-        email: existingCustomer.email || "",
-        company: existingCustomer.company
+        revenue: updatedCustomer.revenue
       });
       
-      // Then update the customer in the API - only send compatible fields
+      // Then update the customer in the API with all relevant fields
       await apiClient.customers.update(id, {
         name: updatedCustomer.name,
         status: apiStatus,
-        email: existingCustomer.email || "", // Use existing email or empty string as fallback
-        company: existingCustomer.company // Use existing company
+        revenue: updatedCustomer.revenue
       });
       
       console.log('Customer updated successfully');
@@ -235,20 +259,18 @@ const Customers = () => {
   };
 
   const handleDeleteCustomer = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this customer?')) {
-      try {
-        setLoading(true);
-        // Delete the customer via API
-        await apiClient.customers.delete(id);
-        
-        // Update the local state
-        setCustomers(prevCustomers => prevCustomers.filter(customer => customer.id !== id));
-      } catch (err) {
-        console.error('Error deleting customer:', err);
-        alert('Failed to delete customer. Please try again.');
-      } finally {
-        setLoading(false);
-      }
+    try {
+      setLoading(true);
+      // Delete the customer via API
+      await apiClient.customers.delete(id);
+      
+      // Update the local state
+      setCustomers(prevCustomers => prevCustomers.filter(customer => customer.id !== id));
+    } catch (err) {
+      console.error('Error deleting customer:', err);
+      alert('Failed to delete customer. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -260,17 +282,32 @@ const Customers = () => {
   // Sort customers based on current sort state
   if (sortColumn) {
     filteredCustomers = [...filteredCustomers].sort((a, b) => {
-      const aValue = a[sortColumn];
-      const bValue = b[sortColumn];
+      let aValue = a[sortColumn];
+      let bValue = b[sortColumn];
       
-      // Handle undefined values (treat them as empty strings for comparison)
-      const aCompare = aValue !== undefined ? aValue : '';
-      const bCompare = bValue !== undefined ? bValue : '';
+      // Special handling for revenue to sort numerically
+      if (sortColumn === 'revenue') {
+        // Convert currency strings to numbers for accurate comparison
+        const parseRevenueValue = (val: string | undefined): number => {
+          if (!val) return 0;
+          // Remove currency symbols, commas, etc and convert to number
+          const numericValue = parseFloat(val.replace(/[$,]/g, ''));
+          return isNaN(numericValue) ? 0 : numericValue;
+        };
+        
+        aValue = parseRevenueValue(aValue as string);
+        bValue = parseRevenueValue(bValue as string);
+      } else {
+        // Handle undefined values (treat them as empty strings for comparison)
+        aValue = aValue !== undefined ? aValue : '';
+        bValue = bValue !== undefined ? bValue : '';
+      }
       
-      if (aCompare < bCompare) {
+      // Compare the values
+      if (aValue < bValue) {
         return sortDirection === 'asc' ? -1 : 1;
       }
-      if (aCompare > bCompare) {
+      if (aValue > bValue) {
         return sortDirection === 'asc' ? 1 : -1;
       }
       return 0;
@@ -299,6 +336,24 @@ const Customers = () => {
     }
   };
   
+  // Helper function to format revenue with $ sign and commas
+  const formatRevenue = (revenue: string | undefined): string => {
+    if (!revenue) return '$0';
+    
+    // If revenue already has $ sign, just ensure it's formatted properly
+    if (revenue.startsWith('$')) {
+      // Extract the numeric part, parse it and reformat
+      const numericValue = parseFloat(revenue.replace(/[$,]/g, ''));
+      if (isNaN(numericValue)) return '$0';
+      return `$${numericValue.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}`;
+    }
+    
+    // Otherwise, parse the value and add $ sign
+    const numericValue = parseFloat(revenue);
+    if (isNaN(numericValue)) return '$0';
+    return `$${numericValue.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}`;
+  };
+  
   return (
     <div>
       {/* Header with breadcrumb and improved styling */}
@@ -317,9 +372,8 @@ const Customers = () => {
             // Transform the data from the modal to match what our API expects
             const apiCustomer = {
               name: customerFromModal.name,
-              status: customerFromModal.status,
-              email: '', // Add default email since modal doesn't collect it
-              company: '' // Add default company since modal doesn't collect it
+              revenue: customerFromModal.revenue,
+              status: customerFromModal.status
             };
             handleSaveCustomer(apiCustomer);
           }} />
@@ -427,7 +481,7 @@ const Customers = () => {
                     }}
                   >
                     <TableCell className="font-medium">{customer.name}</TableCell>
-                    <TableCell>{customer.revenue}</TableCell>
+                    <TableCell>{formatRevenue(customer.revenue)}</TableCell>
                     <TableCell>
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeStyle(customer.status)}`}>
                         {customer.status ? (customer.status.charAt(0).toUpperCase() + customer.status.slice(1)) : 'Unknown'}

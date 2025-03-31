@@ -142,21 +142,22 @@ export function EditIdeaModal({
       <DialogContent className="sm:max-w-[525px]">
         <DialogHeader>
           <DialogTitle>Edit Idea</DialogTitle>
-          <DialogDescription className="mt-2">
-            <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-              <div>
-                <span className="font-medium">Created:</span> {idea.createdAt || 'Recently'}
-              </div>
-              {idea.customer && (
-                <div>
-                  <span className="font-medium">Customer:</span> {idea.customer}
-                </div>
-              )}
-              <div>
-                <span className="font-medium">Status:</span> {idea.status.replace('_', ' ')}
-              </div>
-            </div>
+          <DialogDescription>
+            Make changes to your idea details below.
           </DialogDescription>
+          <div className="flex flex-wrap gap-3 mt-2 text-xs text-muted-foreground">
+            <div>
+              <span className="font-medium">Created:</span> {idea.createdAt || 'Recently'}
+            </div>
+            {idea.customer && (
+              <div>
+                <span className="font-medium">Customer:</span> {idea.customer}
+              </div>
+            )}
+            <div>
+              <span className="font-medium">Status:</span> {idea.status.replace('_', ' ')}
+            </div>
+          </div>
         </DialogHeader>
         <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
           <FormItem>
@@ -271,10 +272,8 @@ export function EditIdeaModal({
                 variant="destructive" 
                 size="sm"
                 onClick={() => {
-                  if (window.confirm("Are you sure you want to delete this idea? This action cannot be undone.")) {
-                    onDelete(idea.id);
-                    setOpen(false);
-                  }
+                  onDelete(idea.id);
+                  setOpen(false);
                 }}
                 className="mr-auto"
               >

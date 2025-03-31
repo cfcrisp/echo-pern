@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Pencil, Trash2, X } from 'lucide-react';
+import { Pencil, Trash2, X, ChevronDown, Check } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
+import React from 'react';
 
 type GoalStatus = 'active' | 'planned' | 'completed';
 
@@ -30,13 +31,12 @@ export type Goal = {
   description: string;
   status: GoalStatus;
   target_date?: string;
-  linked_initiatives?: string[];
   created_at?: string;
 };
 
 type EditGoalModalProps = {
   goal: Goal;
-  onUpdate: (updatedGoal: {
+  onUpdate: (goal: {
     title: string;
     description: string;
     status: GoalStatus;
@@ -46,7 +46,7 @@ type EditGoalModalProps = {
   onDelete?: (id: string) => void;
   triggerButtonSize?: 'default' | 'sm' | 'lg' | 'icon';
   triggerButtonId?: string;
-  initiatives?: Array<{ id: string; title: string; status: string }>;
+  initiatives?: Array<{ id: string; title: string; status: string; goal_id?: string }>;
 };
 
 export function EditGoalModal({ 
@@ -65,6 +65,8 @@ export function EditGoalModal({
     target_date: '',
     linked_initiatives: [] as string[]
   });
+  const [initiativesDropdownOpen, setInitiativesDropdownOpen] = useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
 
   // Special handling for triggerButtonId - if provided, we need to setup a click handler
   useEffect(() => {
@@ -85,42 +87,53 @@ export function EditGoalModal({
   // Initialize form with goal data when modal opens
   useEffect(() => {
     if (open) {
+      // Find initiatives linked to this goal
+      const linkedInitiativesIds = initiatives
+        .filter(initiative => initiative.goal_id === goal.id)
+        .map(initiative => initiative.id);
+      
+      // Set initial form state with current goal data
       setFormData({
-        title: goal.title,
-        description: goal.description,
-        status: goal.status,
+        title: goal.title || '',
+        description: goal.description || '',
+        status: goal.status || 'active',
         target_date: goal.target_date || '',
-        linked_initiatives: goal.linked_initiatives || []
+        linked_initiatives: linkedInitiativesIds || []
       });
     }
-  }, [open, goal]);
+  }, [open, goal, initiatives]);
 
-  const handleChange = (field: string, value: string) => {
+  // Handle clicks outside the dropdown to close it
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setInitiativesDropdownOpen(false);
+      }
+    };
+
+    // Add event listener when dropdown is open
+    if (initiativesDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    // Clean up
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [initiativesDropdownOpen]);
+
+  const handleChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleInitiativeToggle = (initiativeId: string) => {
-    setFormData(prev => {
-      const currentInitiatives = [...prev.linked_initiatives];
-      const index = currentInitiatives.indexOf(initiativeId);
-      
-      if (index !== -1) {
-        // Remove if already selected
-        currentInitiatives.splice(index, 1);
-      } else {
-        // Add if not already selected
-        currentInitiatives.push(initiativeId);
-      }
-      
-      return {
-        ...prev,
-        linked_initiatives: currentInitiatives
-      };
-    });
-  };
-
   const handleSubmit = () => {
-    onUpdate(formData);
+    // Process form data before submitting
+    const processedData = {
+      ...formData,
+      target_date: formData.target_date ? formData.target_date : undefined
+    };
+    
+    onUpdate(processedData);
     setOpen(false);
   };
 
@@ -128,6 +141,13 @@ export function EditGoalModal({
   const handleOpenChange = (newOpenState: boolean) => {
     console.log('Goal dialog state changing:', { current: open, new: newOpenState });
     setOpen(newOpenState);
+  };
+
+  const handleDelete = () => {
+    if (onDelete) {
+      onDelete(goal.id);
+      setOpen(false);
+    }
   };
 
   return (
@@ -201,36 +221,83 @@ export function EditGoalModal({
           {initiatives.length > 0 && (
             <FormItem>
               <FormLabel>Linked Initiatives</FormLabel>
-              <div className="mt-2 border rounded-md p-3 max-h-48 overflow-y-auto">
-                <div className="space-y-2">
-                  {initiatives.map(initiative => (
-                    <div 
-                      key={initiative.id} 
-                      className="flex items-center space-x-2"
-                    >
-                      <input 
-                        type="checkbox" 
-                        id={`initiative-edit-${initiative.id}`}
-                        checked={formData.linked_initiatives.includes(initiative.id)}
-                        onChange={() => handleInitiativeToggle(initiative.id)}
-                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                      />
-                      <label 
-                        htmlFor={`initiative-edit-${initiative.id}`}
-                        className="text-sm flex-1 cursor-pointer"
-                      >
-                        {initiative.title}
-                        <span className="ml-2 text-xs text-gray-500">
-                          ({initiative.status})
-                        </span>
-                      </label>
-                    </div>
-                  ))}
-                  
-                  {initiatives.length === 0 && (
-                    <p className="text-sm text-gray-500">No initiatives available to link</p>
-                  )}
+              <div className="relative">
+                <div 
+                  className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm cursor-pointer"
+                  onClick={() => {
+                    // Toggle dropdown
+                    setInitiativesDropdownOpen(!initiativesDropdownOpen);
+                  }}
+                >
+                  <div className="flex flex-wrap gap-1">
+                    {formData.linked_initiatives.length === 0 ? (
+                      <span className="text-muted-foreground">Select initiatives to link</span>
+                    ) : (
+                      formData.linked_initiatives.map(id => {
+                        const initiative = initiatives.find(i => i.id === id);
+                        return initiative ? (
+                          <span key={id} className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors bg-secondary text-secondary-foreground mb-1">
+                            {initiative.title}
+                            <button
+                              className="ml-1 rounded-full"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // Remove this initiative
+                                setFormData(prev => ({
+                                  ...prev,
+                                  linked_initiatives: prev.linked_initiatives.filter(i => i !== id)
+                                }));
+                              }}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        ) : null;
+                      })
+                    )}
+                  </div>
+                  <ChevronDown className="h-4 w-4 opacity-50" />
                 </div>
+                
+                {initiativesDropdownOpen && (
+                  <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border bg-popover text-popover-foreground shadow-md" ref={dropdownRef}>
+                    <div className="p-1">
+                      {initiatives.map(initiative => {
+                        const isSelected = formData.linked_initiatives.includes(initiative.id);
+                        return (
+                          <div
+                            key={initiative.id}
+                            className={`relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground ${isSelected ? 'bg-accent/50' : ''}`}
+                            onClick={() => {
+                              // Toggle this initiative
+                              setFormData(prev => {
+                                const newLinkedInitiatives = [...prev.linked_initiatives];
+                                const index = newLinkedInitiatives.indexOf(initiative.id);
+                                if (index === -1) {
+                                  newLinkedInitiatives.push(initiative.id);
+                                } else {
+                                  newLinkedInitiatives.splice(index, 1);
+                                }
+                                return {
+                                  ...prev,
+                                  linked_initiatives: newLinkedInitiatives
+                                };
+                              });
+                            }}
+                          >
+                            <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+                              {isSelected && <Check className="h-4 w-4" />}
+                            </span>
+                            {initiative.title}
+                            <span className="ml-2 text-xs text-gray-500">
+                              ({initiative.status})
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 Link relevant initiatives to this goal for better tracking
@@ -244,12 +311,7 @@ export function EditGoalModal({
               <Button 
                 variant="destructive" 
                 size="sm"
-                onClick={() => {
-                  if (window.confirm("Are you sure you want to delete this goal? This action cannot be undone.")) {
-                    onDelete(goal.id);
-                    setOpen(false);
-                  }
-                }}
+                onClick={handleDelete}
                 className="mr-auto"
               >
                 <Trash2 className="h-4 w-4 mr-2" />

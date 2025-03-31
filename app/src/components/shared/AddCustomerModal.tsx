@@ -53,6 +53,12 @@ export function AddCustomerModal({
   };
 
   const handleSubmit = () => {
+    // Validate name field
+    if (!customer.name.trim()) {
+      alert('Customer name is required');
+      return;
+    }
+    
     // Format the revenue as a dollar amount
     const formattedCustomer = {
       ...customer,
@@ -61,7 +67,10 @@ export function AddCustomerModal({
         "$0.00"
     };
     
+    console.log('Formatted customer data before sending to parent:', formattedCustomer);
     onSave(formattedCustomer);
+    
+    // Reset form
     setCustomer({
       name: '',
       revenue: '',

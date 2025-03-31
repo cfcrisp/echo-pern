@@ -371,17 +371,15 @@ const Ideas = () => {
 
   // Handler for deleting idea
   const handleDeleteIdea = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this idea? This action cannot be undone.')) {
-      try {
-        await apiClient.ideas.delete(id);
-        
-        // Update the local state by filtering out the deleted idea
-        setIdeas(prevIdeas => prevIdeas.filter(idea => idea.id !== id));
-        
-      } catch (err) {
-        console.error('Error deleting idea:', err);
-        alert('Failed to delete the idea. Please try again.');
-      }
+    try {
+      setLoading(true);
+      await apiClient.ideas.delete(id);
+      setIdeas(prevIdeas => prevIdeas.filter(idea => idea.id !== id));
+    } catch (err) {
+      console.error('Error deleting idea:', err);
+      alert('Failed to delete idea. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 

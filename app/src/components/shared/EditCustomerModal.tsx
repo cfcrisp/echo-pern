@@ -142,10 +142,8 @@ export function EditCustomerModal({ customer, onUpdate, onDelete, triggerButtonS
                 variant="destructive" 
                 size="sm"
                 onClick={() => {
-                  if (window.confirm("Are you sure you want to delete this customer? This action cannot be undone.")) {
-                    onDelete(customer.id);
-                    setOpen(false);
-                  }
+                  onDelete(customer.id);
+                  setOpen(false);
                 }}
                 className="mr-auto"
               >

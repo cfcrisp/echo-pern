@@ -286,6 +286,10 @@ const Goals: React.FC = () => {
     status: string;
     goal_id?: string;
   }>>([]);
+  // Track goals that are currently being deleted
+  const [deletingGoals, setDeletingGoals] = useState<Set<string>>(new Set());
+  // Track goals that have been deleted to prevent double deletion
+  const [deletedGoals, setDeletedGoals] = useState<Set<string>>(new Set());
 
   // Fetch goals data from API when component mounts
   useEffect(() => {
@@ -333,11 +337,50 @@ const Goals: React.FC = () => {
     description: string;
     status: 'active' | 'planned' | 'completed';
     target_date?: string;
+    linked_initiatives?: string[];
   }) => {
     try {
       setLoading(true);
-      // Create the new goal via API
-      const newGoal = await apiClient.goals.create(goalData);
+      
+      // Extract linked initiatives if they exist
+      const { linked_initiatives, ...goalDataForApi } = goalData;
+      
+      // Create the new goal via API - only send fields that exist in the database
+      const newGoal = await apiClient.goals.create(goalDataForApi);
+      
+      // Validate that we got a valid goal back before updating state
+      if (!newGoal || !newGoal.id) {
+        throw new Error('Failed to create goal: Invalid response from server');
+      }
+      
+      // Update initiatives to link them to the new goal
+      if (linked_initiatives && linked_initiatives.length > 0 && newGoal.id) {
+        console.log(`Linking ${linked_initiatives.length} initiatives to new goal ${newGoal.id}`);
+        
+        try {
+          // Update each initiative to point to this goal
+          const updatePromises = linked_initiatives.map(initiativeId => 
+            apiClient.initiatives.update(initiativeId, { goal_id: newGoal.id })
+          );
+          
+          await Promise.all(updatePromises);
+          
+          // Update the local initiatives state
+          setInitiatives(prevInitiatives => 
+            prevInitiatives.map(initiative => 
+              linked_initiatives.includes(initiative.id) 
+                ? { ...initiative, goal_id: newGoal.id }
+                : initiative
+            )
+          );
+          
+          // Add initiatives count to the new goal for UI purposes
+          newGoal.initiatives_count = linked_initiatives.length;
+        } catch (linkError) {
+          console.error('Error linking initiatives to goal:', linkError);
+          // Don't fail the whole operation if linking fails
+        }
+      }
       
       // Update the local state with the new goal
       setGoals(prevGoals => [...prevGoals, newGoal]);
@@ -362,25 +405,26 @@ const Goals: React.FC = () => {
   }) => {
     try {
       setLoading(true);
-      // Extract linked initiatives before sending data to API
-      const { linked_initiatives, ...apiGoalData } = goalData;
       
-      // Update the goal via API
-      await apiClient.goals.update(id, apiGoalData);
+      // Extract linked initiatives if they exist
+      const { linked_initiatives, ...goalDataForApi } = goalData;
+      
+      // Update the goal via API - only send fields that exist in the database
+      await apiClient.goals.update(id, goalDataForApi);
       
       // Handle updating initiative relationships if provided
       if (linked_initiatives) {
         // Find currently linked initiatives
         const currentlyLinked = initiatives.filter(initiative => initiative.goal_id === id)
-                                           .map(initiative => initiative.id);
+                                          .map(initiative => initiative.id);
         
         // Find initiatives to link (not already linked)
         const toLink = linked_initiatives.filter(initiativeId => 
-                                            !currentlyLinked.includes(initiativeId));
+                                          !currentlyLinked.includes(initiativeId));
         
         // Find initiatives to unlink (no longer in the list)
         const toUnlink = currentlyLinked.filter(initiativeId => 
-                                              !linked_initiatives.includes(initiativeId));
+                                            !linked_initiatives.includes(initiativeId));
         
         // Update all initiatives that need changes
         const updatePromises = [
@@ -410,7 +454,11 @@ const Goals: React.FC = () => {
       // Update the local state
       setGoals(prevGoals => 
         prevGoals.map(goal => 
-          goal.id === id ? { ...goal, ...goalData } : goal
+          goal.id === id ? { 
+            ...goal, 
+            ...goalDataForApi,
+            initiatives_count: linked_initiatives?.length || 0
+          } : goal
         )
       );
     } catch (err) {
@@ -422,28 +470,85 @@ const Goals: React.FC = () => {
   };
 
   const handleDeleteGoal = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this goal?')) {
-      try {
-        setLoading(true);
-        // Delete the goal via API
-        await apiClient.goals.delete(id);
+    try {
+      // Check if this goal is already being deleted or has been deleted
+      if (deletingGoals.has(id)) {
+        console.log(`Delete operation already in progress for goal: ${id}`);
+        return;
+      }
+      
+      if (deletedGoals.has(id)) {
+        console.log(`Goal has already been deleted: ${id}`);
+        return;
+      }
+      
+      // Mark as being deleted to prevent multiple deletion attempts
+      setDeletingGoals(prev => new Set([...prev, id]));
+      setLoading(true);
+      
+      // First find the goal to check if it exists
+      const goalToDelete = goals.find(g => g.id === id);
+      if (!goalToDelete) {
+        console.error(`Goal with ID ${id} not found in local state`);
+        // If not found in local state, it might already be deleted on server
+        setDeletedGoals(prev => new Set([...prev, id]));
+        setLoading(false);
+        return;
+      }
+      
+      console.log(`Attempting to delete goal: ${id}`);
+      
+      // Delete the goal via API
+      const result = await apiClient.goals.delete(id);
+      
+      if (result && result.success) {
+        // Mark as deleted
+        setDeletedGoals(prev => new Set([...prev, id]));
         
         // Update the local state
         setGoals(prevGoals => prevGoals.filter(goal => goal.id !== id));
-      } catch (err) {
-        console.error('Error deleting goal:', err);
-        alert('Failed to delete goal. Please try again.');
-      } finally {
-        setLoading(false);
+        
+        // Optionally show a subtle success message (toast would be ideal)
+        console.log(`Goal "${goalToDelete.title}" successfully deleted`);
+      } else {
+        throw new Error('Failed to delete goal: Unexpected response from server');
       }
+    } catch (err) {
+      console.error('Error deleting goal:', err);
+      alert('Failed to delete goal. Please try again.');
+    } finally {
+      // Remove from deleting set
+      setDeletingGoals(prev => {
+        const newSet = new Set([...prev]);
+        newSet.delete(id);
+        return newSet;
+      });
+      setLoading(false);
     }
   };
 
+  // Add safety helper functions
+  const safeGoalTitle = (goal: any): string => {
+    if (!goal) return '';
+    if (typeof goal.title !== 'string') return '';
+    return goal.title;
+  };
+
+  const safeGoalDescription = (goal: any): string => {
+    if (!goal) return '';
+    if (typeof goal.description !== 'string') return '';
+    return goal.description;
+  };
+
   // Filter goals based on the search term
-  const filteredGoals = goals.filter(goal => 
-    goal.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    goal.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredGoals = goals.filter(goal => {
+    if (!goal) return false;
+    
+    const titleMatch = safeGoalTitle(goal).toLowerCase().includes(searchTerm.toLowerCase());
+    const descriptionMatch = safeGoalDescription(goal).toLowerCase().includes(searchTerm.toLowerCase());
+    
+    return titleMatch || descriptionMatch;
+  });
 
   // Filter goals based on the active tab
   const displayedGoals = activeTab === 'all' 
@@ -452,6 +557,7 @@ const Goals: React.FC = () => {
 
   // Get initiatives linked to a specific goal
   const getLinkedInitiatives = (goalId: string) => {
+    // Filter initiatives to get only those linked to this goal
     return initiatives.filter(initiative => initiative.goal_id === goalId);
   };
 

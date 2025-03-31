@@ -22,6 +22,21 @@ import {
   SelectValue
 } from "@/components/ui/select";
 
+// Helper to format dates in a readable format
+const formatDate = (dateString?: string): string => {
+  if (!dateString) return 'Unknown';
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    });
+  } catch (e) {
+    return 'Invalid date';
+  }
+};
+
 type InitiativeStatus = 'active' | 'planned' | 'completed';
 
 export type Initiative = {
@@ -31,6 +46,7 @@ export type Initiative = {
   status: InitiativeStatus;
   priority: number;
   goalId?: string;
+  created_at?: string;
 };
 
 type Goal = {
@@ -144,16 +160,14 @@ export function EditInitiativeModal({
       <DialogContent className="sm:max-w-[525px]">
         <DialogHeader>
           <DialogTitle>Edit Initiative</DialogTitle>
-          <DialogDescription className="mt-2">
-            <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-              <div>
-                <span className="font-medium">Priority:</span> {priorityLabels[initiative.priority - 1] || 'Unknown'}
-              </div>
-              <div>
-                <span className="font-medium">Status:</span> {initiative.status.charAt(0).toUpperCase() + initiative.status.slice(1)}
-              </div>
-            </div>
+          <DialogDescription>
+            Make changes to the initiative.
           </DialogDescription>
+          <div className="flex flex-col mt-2 text-sm text-muted-foreground">
+            <div>
+              <span className="font-medium">Initiative ID:</span> {initiative.id.substring(0, 8)}...
+            </div>
+          </div>
         </DialogHeader>
         <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
           <FormItem>
@@ -233,10 +247,8 @@ export function EditInitiativeModal({
                 variant="destructive" 
                 size="sm"
                 onClick={() => {
-                  if (window.confirm("Are you sure you want to delete this initiative? This action cannot be undone.")) {
-                    onDelete(initiative.id);
-                    setOpen(false);
-                  }
+                  onDelete(initiative.id);
+                  setOpen(false);
                 }}
                 className="mr-auto"
               >

@@ -454,21 +454,48 @@ const Feedback = () => {
 
   // Handler for deleting feedback
   const handleDeleteFeedback = async (id: string) => {
-    // Use the window.confirm dialog for simplicity
-    if (window.confirm("Are you sure you want to delete this feedback item? This action cannot be undone.")) {
-      try {
-        setLoading(true);
-        // Delete feedback via API
-        await apiClient.feedback.delete(id);
-        
-        // Update the local state
-        setFeedback(prevFeedback => prevFeedback.filter(item => item.id !== id));
-      } catch (err) {
-        console.error('Error deleting feedback:', err);
-        alert('Failed to delete feedback. Please try again.');
-      } finally {
-        setLoading(false);
+    try {
+      setLoading(true);
+      
+      // Get auth token from any available storage location
+      const token = localStorage.getItem('authToken') || 
+                   localStorage.getItem('jwt') || 
+                   sessionStorage.getItem('authToken') || 
+                   sessionStorage.getItem('jwt') || '';
+      
+      // Create URL for the delete request
+      const url = new URL(`http://localhost:3000/feedback/${id}`);
+      
+      // Make direct fetch request with auth headers
+      const response = await fetch(url.toString(), {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+          'X-Tenant-ID': user?.tenant_id || '',
+        },
+        credentials: 'include',
+      });
+      
+      // Handle error responses
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          throw new Error(`Server error: ${response.status} - ${errorText}`);
+        }
+        throw new Error(errorData.error || `Server error: ${response.status}`);
       }
+      
+      // Update the local state only if the server request was successful
+      setFeedback(prevFeedback => prevFeedback.filter(item => item.id !== id));
+    } catch (err) {
+      console.error('Error deleting feedback:', err);
+      alert('Failed to delete feedback. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
